@@ -35,10 +35,21 @@ ENV/
 # Project specific
 DATA/
 features/
+models/
 *.csv
 *.json
 *.pkl
+*.joblib
 *.model
+*.npy
+*.npz
+
+# Audio files
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
 
 # IDE specific
 .vscode/
@@ -46,8 +57,35 @@ features/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
 
-# Logs
+# Logs and outputs
+*.log
+logs/
+output/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Local development settings
+local_settings.py
+
+# Project configuration
+config.ini
+
+# Database
+*.db
+*.sqlite3
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.log
 
 # Local development
