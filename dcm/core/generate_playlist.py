@@ -7,7 +7,8 @@ from typing import List, Optional , Dict, Union
 from numpy.random import rand
 import pandas as pd 
 from rich.console import Console
-from rich.progress import track   # Rich is used to imporve the UI in CLI
+from rich.progress import track 
+import numpy as np # Rich is used to imporve the UI in CLI
 # Set up logging 
 
 logging.basicConfig(
@@ -76,7 +77,7 @@ class PlaylistGenerator:
             abs_paths = [str(Path(path).resolve()) for path in song_paths] 
             
             # Write the playlist to a file 
-            with open(output_file, 'w', ecoding = 'utf-8') as f:
+            with open(output_file, 'w', encoding='utf-8') as f:
                 # Write M3U header 
                 f.write("#EXTM3U\n") 
                 
@@ -153,27 +154,40 @@ class PlaylistGenerator:
             logger.error(f"Error generating playlist: {e}") 
             return False 
     
-    def find_similar_songs(self, song_path: str, int = 5) -> List[str] :
-        try :
-            # FInd index of reference song 
+    def find_similar_songs(self, song_path: str, n: int = 5) -> List[str]:
+        """Find n songs similar to the given song.
+    
+        Args:
+        song_path: Path to the reference song
+        n: Number of similar songs to find (default: 5)
+        
+        Returns:
+            List of paths to similar songs
+        """
+        try:
             abs_path = str(Path(song_path).resolve())
-            song_idx = self.features_df[self.features_df['file_path'] == abs_path.index]
-            
+            song_mask = self.features_df['file_path'] == abs_path
+            song_idx = self.features_df[song_mask].index
+        
             if len(song_idx) == 0:
                 logger.warning(f"Song not found in database: {song_path}")
-                return [] 
+                return []
             
-            features= self.get_features_vectors() 
-            # Calculat cosine similarity 
-            from sklearn.metrics.pairwise import cosine_similarity 
-            similarities = cosine_similarity(features[song_idx], features)[0]  
-            
-            # Get top n simiilar songs 
-            similar_indices = similarites.argsort()[-n-1:-1][::-1]
-            return self.features_df.iloc[similar_indices]['file_path'].tolist() 
+            features = self.get_feature_vectors()
+        
+            from sklearn.metrics.pairwise import cosine_similarity
+            similarities = cosine_similarity(
+                features[song_idx],
+                features
+            )[0]
+        
+            # Get top n similar songs (excluding the song itself)
+            similar_indices = similarities.argsort()[-n-1:-1][::-1]
+            return self.features_df.iloc[similar_indices]['file_path'].tolist()
+        
         except Exception as e:
-            logger.error(f"Error finding similar songs: {e}") 
-            return [] 
+            logger.error(f"Error finding similar songs: {e}")
+            return []
         
     def get_feature_vectors(self) -> np.ndarray:
         # Gets the feature vectors from the features dataframe and then normalizes it 
@@ -184,3 +198,33 @@ class PlaylistGenerator:
         return StandardScaler().fit_transform(features) 
     
     
+def main() :
+    # CLI for the Playlist generator 
+    import argparse 
+    import sys 
+    
+    parser = argparse.ArgumentParser(description = "DCM Playlist Generator") 
+    parser.add_argument('features_file', help = 'Path to the features file') 
+    parser.add_argument('output_file', help = "Path to save the playlist") 
+    parser.add_argument('songs', nargs = "+" , help = 'List of seed songs') 
+    parser.add_argument('--max-songs', type = int, default = 20, help = "Maximum number of songs in the playlist") 
+    parser.add_argument("--no-shuffle", action = 'store_false', dest = 'shuffle', help = 'Disable shuffling') 
+    parser.add_argument('--status', action = 'store_false', dest = 'dynamic', help = "Disable dynamic song addition") 
+    
+    args = parser.parse_args() 
+    
+    try :
+        generator = PlaylistGenerator(args.features_file) 
+        success = generator.generate_playlist(
+            args.songs,
+            args.output_file, 
+            max_songs = args.max_songs, 
+            shuffle = args.shuffle, 
+            dynamic = args.dynamic 
+        )
+        sys.exit(0 if success else 1) 
+    except Exception as e :
+        print(f"Error : {e}", file_sus.stderr) 
+        sys.exit(1)
+if __name__ == '__main__': 
+    main() 
