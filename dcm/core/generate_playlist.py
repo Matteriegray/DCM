@@ -4,6 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 from typing import List, Optional , Dict, Union
+from numpy.random import rand
 import pandas as pd 
 from rich.console import Console
 from rich.progress import track   # Rich is used to imporve the UI in CLI
@@ -92,3 +93,94 @@ class PlaylistGenerator:
         except Exception as e:
             logger.error(f"Error saving playlist: {e}") 
             return False 
+        
+    def generate_playlist(
+        self, 
+        song_path: List[str], 
+        output_file: str,
+        playlist_name: Optional[str] = None,
+        max_songs : int = 20, 
+        shuffle : bool = True, 
+        dynamic :bool = True 
+    ) -> bool:
+        """ Generate a playlist from a list of song paths. 
+            
+            Args : song_path, output_file, max_songs, shuffle 
+            
+            returns : bool - True if playlist generation is successfull"""
+        try: 
+            # Filter the songs that exists in the database
+            valid_songs = [] 
+            for song_path in song_path:
+                # Convert to compare
+                abs_path = str(Path(song_path).resolve()) 
+                # Checks if path exists in the database 
+                if not (self.features_df['file_path'] == abs_path).any():
+                    logger.warning(f"Song not found in database: {song_path}") 
+                    continue 
+                valid_songs.append(abs_path) 
+            if not valid_songs:
+                logger.error("No valid songs found in feature database") 
+                return False 
+            
+            playlist = valid_songs.copy() 
+            
+            if dynamic:
+                while len(playlist) < max_songs and len(playlist) < len(self.features_df):
+                    last_songs = playlist[-min(3, len(playlist)):] 
+                    new_songs = [] 
+                    
+                    for song in last_songs:
+                        similar = self.find_similar_songs(song, n = 3)
+                        new_songs.extend([s for s in similar if s not in playlist and s not in new_songs]) 
+                        if len(playlist) + len(new_songs) >= max_songs:
+                            break 
+                    
+                    if not new_songs:
+                        break 
+                    playlist.extend(new_songs[:max_songs - len(playlist)]) 
+                    
+            # Shuffle
+            if shuffle :
+                if dynamic : 
+                    initial_songs = valid_songs.copy() 
+                    random.shuffle(initial_songs)
+                    playlist = initial_songs + playlist[len(initial_songs)]  
+                else:
+                    random.shuffle(playlist)            
+            return self.save_as_m3u(playlist[:max_songs], output_file, playlist_name)
+        except Exception as e:
+            logger.error(f"Error generating playlist: {e}") 
+            return False 
+    
+    def find_similar_songs(self, song_path: str, int = 5) -> List[str] :
+        try :
+            # FInd index of reference song 
+            abs_path = str(Path(song_path).resolve())
+            song_idx = self.features_df[self.features_df['file_path'] == abs_path.index]
+            
+            if len(song_idx) == 0:
+                logger.warning(f"Song not found in database: {song_path}")
+                return [] 
+            
+            features= self.get_features_vectors() 
+            # Calculat cosine similarity 
+            from sklearn.metrics.pairwise import cosine_similarity 
+            similarities = cosine_similarity(features[song_idx], features)[0]  
+            
+            # Get top n simiilar songs 
+            similar_indices = similarites.argsort()[-n-1:-1][::-1]
+            return self.features_df.iloc[similar_indices]['file_path'].tolist() 
+        except Exception as e:
+            logger.error(f"Error finding similar songs: {e}") 
+            return [] 
+        
+    def get_feature_vectors(self) -> np.ndarray:
+        # Gets the feature vectors from the features dataframe and then normalizes it 
+        feature_columns = [col for col in self.features_df.columns 
+                           if col not in ['file_path', 'file_name', 'file_extension', 'file_size_mb']] 
+        features = self.features_df[feature_columns].values 
+        from sklearn.preprocessing import StandardScaler 
+        return StandardScaler().fit_transform(features) 
+    
+    
