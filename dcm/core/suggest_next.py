@@ -78,7 +78,7 @@ class SongRecommender:
                 self.features_df = pd.DataFrame()
             
             logger.debug("SongRecommender initialization complete")
-            
+            n
         except Exception as e:
             logger.error(f"Error initializing SongRecommender: {str(e)}")
             logger.debug(f"Features DataFrame: {self.features_df}")

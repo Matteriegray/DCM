@@ -162,76 +162,139 @@ class PlaylistGenerator:
             logger.error(f"Error: {e}")
             return False
     
+    def _get_song_index(self, song_path: str) -> Optional[int]:
+        """Helper to find a song index by filename or path.
+        
+        Args:
+            song_path: Path or filename of the song
+            
+        Returns:
+            Index of the song in the features dataframe, or None if not found
+        """
+        # Get just the filename
+        song_filename = str(Path(song_path).name)
+        
+        # First try matching the full path (if provided)
+        if Path(song_path).is_absolute():
+            matches = self.features_df['file_path'] == song_path
+            if matches.any():
+                return matches.idxmax()
+        
+        # Try matching just the filename in the file_path column
+        matches = self.features_df['file_path'].str.endswith(song_filename)
+        if matches.any():
+            return matches.idxmax()
+            
+        # Try case-insensitive filename match
+        matches = self.features_df['file_path'].str.lower().str.endswith(song_filename.lower())
+        if matches.any():
+            return matches.idxmax()
+            
+        # Try matching the filename with the file_name column if it exists
+        if 'file_name' in self.features_df.columns:
+            matches = self.features_df['file_name'] == song_filename
+            if matches.any():
+                return matches.idxmax()
+                
+            # Case-insensitive match with file_name
+            matches = self.features_df['file_name'].str.lower() == song_filename.lower()
+            if matches.any():
+                return matches.idxmax()
+        
+        logger.warning(f"Song not found in database: {song_path}")
+        logger.debug(f"Available songs: {self.features_df['file_path'].head().tolist()}")
+        return None
+        
     def find_similar_songs(
         self, 
         song_path: str, 
         n: int = 5, 
         genre_filter: Optional[str] = None,
-        mood_filter: Optional[str] = None
+        mood_filter: Optional[str] = None,
+        mood_similarity_threshold: float = 0.7
     ) -> List[str]:
         """Find n songs similar to the given song with optional filters.
         
         Args:
-            song_path: Path to the reference song
+            song_path: Path or filename of the reference song
             n: Number of similar songs to find
             genre_filter: Optional genre to filter by
             mood_filter: Optional mood to filter by
+            mood_similarity_threshold: Threshold for mood similarity (0-1)
             
         Returns:
             List of paths to similar songs matching the filters
         """
         try:
-            logger.debug(f"Finding similar songs for: {song_path}")
-            abs_path = str(Path(song_path).resolve())
-            song_mask = self.features_df['file_path'] == abs_path
-            song_idx = self.features_df[song_mask].index
+            logger.debug(f"[DEBUG] Finding similar songs for: {song_path}")
+            song_idx = self._get_song_index(song_path)
             
-            if len(song_idx) == 0:
-                logger.warning(f"Song not found in database: {song_path}")
+            if song_idx is None:
+                logger.warning(f"[DEBUG] Song not found in database: {song_path}")
                 return []
                 
+            logger.debug(f"[DEBUG] Found song at index: {song_idx}")
             features = self.get_feature_vectors()
+            
+            # Debug logging for features
+            logger.debug(f"[DEBUG] Features shape: {features.shape if hasattr(features, 'shape') else 'N/A'}")
+            logger.debug(f"[DEBUG] Features type: {type(features)}")
             
             # Get similarity scores
             from sklearn.metrics.pairwise import cosine_similarity
-            similarities = cosine_similarity(
-                features[song_idx],
-                features
-            )[0]
             
-            # Get indices sorted by similarity (descending)
-            similar_indices = similarities.argsort()[::-1]
-            
-            # Filter and collect results
-            results = []
-            for idx in similar_indices:
-                if idx == song_idx[0]:  # Skip the song itself
-                    continue
+            # Ensure we have a 2D array for the reference song
+            try:
+                ref_song_features = features[song_idx:song_idx+1]  # This ensures 2D array with shape (1, n_features)
+                logger.debug(f"[DEBUG] Reference song features shape: {ref_song_features.shape if hasattr(ref_song_features, 'shape') else 'N/A'}")
+                
+                # Calculate similarities between reference song and all other songs
+                similarities = cosine_similarity(ref_song_features, features)
+                logger.debug(f"[DEBUG] Similarities shape: {similarities.shape if hasattr(similarities, 'shape') else 'N/A'}")
+                
+                # Flatten the similarities array if needed
+                if len(similarities.shape) > 1 and similarities.shape[0] == 1:
+                    similarities = similarities[0]
+                
+                logger.debug(f"[DEBUG] Final similarities shape: {similarities.shape if hasattr(similarities, 'shape') else 'N/A'}")
+                
+                # Get indices sorted by similarity (descending)
+                similar_indices = similarities.argsort()[::-1]
+                
+                # Filter and collect results
+                results = []
+                for idx in similar_indices:
+                    # Skip the reference song itself
+                    if idx == song_idx:
+                        continue
                     
-                current_path = self.features_df.iloc[idx]['file_path']
-                
-                # Apply genre filter if specified
-                if genre_filter:
-                    song_genre = self.get_genre(current_path)
-                    logger.debug(f"Checking genre for {current_path}: {song_genre}")
-                    if song_genre.lower() != genre_filter.lower():
-                        logger.debug(f"Skipping due to genre mismatch: {song_genre} != {genre_filter}")
+                    # Get the song path and metadata
+                    song_row = self.features_df.iloc[idx]
+                    song_path = song_row['file_path']
+                    
+                    # Apply genre filter if specified
+                    if genre_filter and 'genre' in song_row and song_row['genre'] != genre_filter:
+                        logger.debug(f"Skipping {song_path} - genre mismatch")
                         continue
+                    
+                    # Apply mood filter if specified
+                    if mood_filter:
+                        song_mood = self.classify_mood(song_row)
+                        mood_score = self._get_mood_similarity(mood_filter, song_mood)
+                        if mood_score < mood_similarity_threshold:
+                            logger.debug(f"Skipping {song_path} - mood mismatch ({song_mood} vs {mood_filter})")
+                            continue
+                    
+                    results.append(song_path)
+                    if len(results) >= n:
+                        break
                 
-                # Apply mood filter if specified
-                if mood_filter:
-                    song_features = features[idx]
-                    song_mood = self.classify_mood(song_features)
-                    logger.debug(f"Checking mood for {current_path}: {song_mood}")
-                    if song_mood.lower() != mood_filter.lower():
-                        logger.debug(f"Skipping due to mood mismatch: {song_mood} != {mood_filter}")
-                        continue
+                return results
                 
-                results.append(current_path)
-                logger.info(f"Added to results: {current_path}")
-                if len(results) >= n:
-                    break
-            
+            except Exception as e:
+                logger.error(f"[DEBUG] Error in similarity calculation: {e}", exc_info=True)
+                return []
+                
             logger.info(f"Found {len(results)} similar songs for {os.path.basename(song_path)}")
             return results
             
@@ -248,55 +311,76 @@ class PlaylistGenerator:
         return StandardScaler().fit_transform(features) 
     
     def classify_mood(self, features: np.ndarray) -> str:
-        """Classify the mood of an Indian music song based on its features.
-    
-    Args:
-        features: Normalized feature vector of the song
+        """Classify the mood of a song based on its audio features.
         
-    Returns:
-        str: Mood classification ('romantic', 'dance', 'devotional', 'melancholic', 'peppy')
-    """
-    # Energy (RMS) and Valence (Chroma) based classification
-    # More lenient thresholds for Indian film music
-        energy = features[8]  # RMS mean
-        valence = features[50]  # Chroma mean
+        This implementation uses a combination of energy, valence, and other features
+        to determine the mood in a way that works across different music styles.
         
-        # Print feature values for debugging
-        logger.debug(f"Energy: {energy}, Valence: {valence}")
-        
-        # Special case for devotional music (check filename first)
-        file_path = self.features_df.iloc[0]['file_path'].lower()
-        if any(term in file_path for term in ['bhajan', 'devotional', 'suprabhata']):
-            return "devotional"
+        Args:
+            features: Normalized feature vector of the song
             
-        # Special case for sad songs (check filename)
-        if "sad" in file_path or "heartbreak" in file_path:
-            return "melancholic"
+        Returns:
+            str: Mood classification ('romantic', 'dance', 'devotional', 'melancholic', 'peppy', 'energetic')
+        """
+        try:
+            # Extract relevant features with bounds checking
+            energy = min(max(features[8], -1), 1)  # RMS mean (energy)
+            valence = min(max(features[50], -1), 1)  # Chroma mean (valence)
             
-        # Classify based on energy and valence with more lenient thresholds
-        if energy > 0.7:  # High energy
-            if valence > 0.6:
-                return "dance"     # High energy, positive (dance/party songs)
-            elif valence > 0.4:
-                return "peppy"     # High energy, neutral (mass songs)
-            else:
-                return "mass"      # High energy, low valence (intense songs)
-        elif energy > 0.5:  # Medium energy
-            if valence > 0.6:
-                return "romantic"  # Medium energy, positive (romantic songs)
-            elif valence > 0.4:
-                return "melodic"   # Medium energy, neutral (melodic songs)
-            else:
-                return "melancholic"  # Medium energy, negative (sad songs)
-        else:  # Low energy
-            if valence > 0.6:
-                return "romantic"  # Low energy, positive (soft romantic)
-            else:
-                return "melancholic"  # Low energy, negative (sad songs)
-    
+            # Get additional features if available
+            tempo = features[98] if len(features) > 98 else 0  # Tempo feature if available
+            
+            # Special case for devotional music (check filename first)
+            file_path = self.features_df.iloc[0]['file_path'].lower()
+            if any(term in file_path for term in ['bhajan', 'devotional', 'bhakti', 'suprabhata']):
+                return "devotional"
+                
+            # Special case for sad songs (check filename)
+            if any(term in file_path for term in ['sad', 'heartbreak', 'dukkha']):
+                return "melancholic"
+            
+            # Normalize energy and valence to 0-1 range
+            energy_norm = (energy + 1) / 2  # Convert from -1:1 to 0:1
+            valence_norm = (valence + 1) / 2  # Convert from -1:1 to 0:1
+            
+            # Classify based on energy and valence
+            if energy_norm > 0.7:
+                if valence_norm > 0.7:
+                    return "dance"
+                elif valence_norm > 0.5:
+                    return "peppy"
+                elif valence_norm > 0.3:
+                    return "energetic"
+                else:
+                    return "intense"
+                    
+            elif energy_norm > 0.4:
+                if valence_norm > 0.7:
+                    return "romantic"
+                elif valence_norm > 0.5:
+                    return "melodic"
+                elif valence_norm > 0.3:
+                    return "mellow"
+                else:
+                    return "melancholic"
+                    
+            else:  # Low energy
+                if valence_norm > 0.7:
+                    return "romantic"
+                elif valence_norm > 0.5:
+                    return "calm"
+                elif valence_norm > 0.3:
+                    return "mellow"
+                else:
+                    return "melancholic"
+                    
+        except Exception as e:
+            logger.warning(f"Error in mood classification: {e}")
+            return "unknown"  # Default fallback
+            
     def get_genre(self, file_path: str) -> str:
         """Extract genre from file path or metadata for Indian music.
-    
+        
         Args:
             file_path: Path to the audio file
         
@@ -324,9 +408,43 @@ class PlaylistGenerator:
             return 'dance'
         else:
             return 'film'  # Default to film music (most common in Indian music)
+            
+    def _get_mood_similarity(self, mood1: str, mood2: str) -> float:
+        """Calculate similarity between two mood strings.
+        
+        Args:
+            mood1: First mood
+            mood2: Second mood
+            
+        Returns:
+            Similarity score between 0 and 1
+        """
+        # Define mood groups that are considered similar
+        mood_groups = {
+            'dance': {'dance', 'peppy', 'energetic', 'party'},
+            'romantic': {'romantic', 'melodic', 'calm', 'mellow'},
+            'melancholic': {'melancholic', 'sad', 'mellow'},
+            'energetic': {'energetic', 'dance', 'peppy', 'party'},
+            'devotional': {'devotional', 'spiritual'}
+        }
+        
+        mood1 = mood1.lower()
+        mood2 = mood2.lower()
+        
+        # Exact match
+        if mood1 == mood2:
+            return 1.0
+            
+        # Check if moods are in the same group
+        for group in mood_groups.values():
+            if mood1 in group and mood2 in group:
+                return 0.8  # High similarity for same group
+                
+        # No match
+        return 0.0
     
 def main():
-    """Command-line interface for playlist generation."""
+    """Command-line interface for playlist generation"""
     parser = argparse.ArgumentParser(
         description="🎵 Generate playlists with similar song recommendations"
     )
