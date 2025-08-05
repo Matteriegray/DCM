@@ -2,6 +2,7 @@
 import os
 import argparse
 import logging
+import random
 from pathlib import Path
 from typing import List, Optional , Dict, Union
 from numpy.random import rand
@@ -97,94 +98,143 @@ class PlaylistGenerator:
         
     def generate_playlist(
         self, 
-        song_path: List[str], 
+        song_paths: List[str], 
         output_file: str,
         playlist_name: Optional[str] = None,
-        max_songs : int = 20, 
-        shuffle : bool = True, 
-        dynamic :bool = True 
+        max_songs: int = 20, 
+        shuffle: bool = True,
+        dynamic: bool = True,
+        genre: Optional[str] = None,
+        mood: Optional[str] = None
     ) -> bool:
-        """ Generate a playlist from a list of song paths. 
-            
-            Args : song_path, output_file, max_songs, shuffle 
-            
-            returns : bool - True if playlist generation is successfull"""
-        try: 
-            # Filter the songs that exists in the database
-            valid_songs = [] 
-            for song_path in song_path:
-                # Convert to compare
-                abs_path = str(Path(song_path).resolve()) 
-                # Checks if path exists in the database 
+        """Generate a playlist with optional genre and mood filters."""
+        try:
+            # Validate and convert paths
+            valid_songs = []
+            for song_path in song_paths:
+                abs_path = str(Path(song_path).resolve())
                 if not (self.features_df['file_path'] == abs_path).any():
-                    logger.warning(f"Song not found in database: {song_path}") 
-                    continue 
-                valid_songs.append(abs_path) 
+                    logger.warning(f"Song not found: {song_path}")
+                    continue
+                valid_songs.append(abs_path)
+                
             if not valid_songs:
-                logger.error("No valid songs found in feature database") 
-                return False 
+                logger.error("No valid songs found")
+                return False
+                
+            playlist = valid_songs.copy()
             
-            playlist = valid_songs.copy() 
-            
+            # Add similar songs if dynamic
             if dynamic:
                 while len(playlist) < max_songs and len(playlist) < len(self.features_df):
-                    last_songs = playlist[-min(3, len(playlist)):] 
-                    new_songs = [] 
+                    last_songs = playlist[-min(3, len(playlist)):]
+                    new_songs = []
                     
                     for song in last_songs:
-                        similar = self.find_similar_songs(song, n = 3)
-                        new_songs.extend([s for s in similar if s not in playlist and s not in new_songs]) 
+                        similar = self.find_similar_songs(
+                            song, 
+                            n=3,
+                            genre_filter=genre,
+                            mood_filter=mood
+                        )
+                        new_songs.extend([s for s in similar 
+                                       if s not in playlist and s not in new_songs])
                         if len(playlist) + len(new_songs) >= max_songs:
-                            break 
+                            break
                     
                     if not new_songs:
-                        break 
-                    playlist.extend(new_songs[:max_songs - len(playlist)]) 
-                    
-            # Shuffle
-            if shuffle :
-                if dynamic : 
-                    initial_songs = valid_songs.copy() 
+                        break
+                        
+                    playlist.extend(new_songs[:max_songs - len(playlist)])
+            
+            # Shuffle if requested
+            if shuffle:
+                if dynamic:
+                    initial_songs = valid_songs.copy()
                     random.shuffle(initial_songs)
-                    playlist = initial_songs + playlist[len(initial_songs)]  
+                    playlist = initial_songs + playlist[len(initial_songs):]
                 else:
-                    random.shuffle(playlist)            
+                    random.shuffle(playlist)
+            
             return self.save_as_m3u(playlist[:max_songs], output_file, playlist_name)
+            
         except Exception as e:
-            logger.error(f"Error generating playlist: {e}") 
-            return False 
+            logger.error(f"Error: {e}")
+            return False
     
-    def find_similar_songs(self, song_path: str, n: int = 5) -> List[str]:
-        """Find n songs similar to the given song.
-    
-        Args:
-        song_path: Path to the reference song
-        n: Number of similar songs to find (default: 5)
+    def find_similar_songs(
+        self, 
+        song_path: str, 
+        n: int = 5, 
+        genre_filter: Optional[str] = None,
+        mood_filter: Optional[str] = None
+    ) -> List[str]:
+        """Find n songs similar to the given song with optional filters.
         
+        Args:
+            song_path: Path to the reference song
+            n: Number of similar songs to find
+            genre_filter: Optional genre to filter by
+            mood_filter: Optional mood to filter by
+            
         Returns:
-            List of paths to similar songs
+            List of paths to similar songs matching the filters
         """
         try:
+            logger.debug(f"Finding similar songs for: {song_path}")
             abs_path = str(Path(song_path).resolve())
             song_mask = self.features_df['file_path'] == abs_path
             song_idx = self.features_df[song_mask].index
-        
+            
             if len(song_idx) == 0:
                 logger.warning(f"Song not found in database: {song_path}")
                 return []
-            
+                
             features = self.get_feature_vectors()
-        
+            
+            # Get similarity scores
             from sklearn.metrics.pairwise import cosine_similarity
             similarities = cosine_similarity(
                 features[song_idx],
                 features
             )[0]
-        
-            # Get top n similar songs (excluding the song itself)
-            similar_indices = similarities.argsort()[-n-1:-1][::-1]
-            return self.features_df.iloc[similar_indices]['file_path'].tolist()
-        
+            
+            # Get indices sorted by similarity (descending)
+            similar_indices = similarities.argsort()[::-1]
+            
+            # Filter and collect results
+            results = []
+            for idx in similar_indices:
+                if idx == song_idx[0]:  # Skip the song itself
+                    continue
+                    
+                current_path = self.features_df.iloc[idx]['file_path']
+                
+                # Apply genre filter if specified
+                if genre_filter:
+                    song_genre = self.get_genre(current_path)
+                    logger.debug(f"Checking genre for {current_path}: {song_genre}")
+                    if song_genre.lower() != genre_filter.lower():
+                        logger.debug(f"Skipping due to genre mismatch: {song_genre} != {genre_filter}")
+                        continue
+                
+                # Apply mood filter if specified
+                if mood_filter:
+                    song_features = features[idx]
+                    song_mood = self.classify_mood(song_features)
+                    logger.debug(f"Checking mood for {current_path}: {song_mood}")
+                    if song_mood.lower() != mood_filter.lower():
+                        logger.debug(f"Skipping due to mood mismatch: {song_mood} != {mood_filter}")
+                        continue
+                
+                results.append(current_path)
+                logger.info(f"Added to results: {current_path}")
+                if len(results) >= n:
+                    break
+            
+            logger.info(f"Found {len(results)} similar songs for {os.path.basename(song_path)}")
+            return results
+            
         except Exception as e:
             logger.error(f"Error finding similar songs: {e}")
             return []
@@ -197,34 +247,128 @@ class PlaylistGenerator:
         from sklearn.preprocessing import StandardScaler 
         return StandardScaler().fit_transform(features) 
     
+    def classify_mood(self, features: np.ndarray) -> str:
+        """Classify the mood of an Indian music song based on its features.
     
-def main() :
-    # CLI for the Playlist generator 
-    import argparse 
-    import sys 
+    Args:
+        features: Normalized feature vector of the song
+        
+    Returns:
+        str: Mood classification ('romantic', 'dance', 'devotional', 'melancholic', 'peppy')
+    """
+    # Energy (RMS) and Valence (Chroma) based classification
+    # More lenient thresholds for Indian film music
+        energy = features[8]  # RMS mean
+        valence = features[50]  # Chroma mean
+        
+        # Print feature values for debugging
+        logger.debug(f"Energy: {energy}, Valence: {valence}")
+        
+        # Special case for devotional music (check filename first)
+        file_path = self.features_df.iloc[0]['file_path'].lower()
+        if any(term in file_path for term in ['bhajan', 'devotional', 'suprabhata']):
+            return "devotional"
+            
+        # Special case for sad songs (check filename)
+        if "sad" in file_path or "heartbreak" in file_path:
+            return "melancholic"
+            
+        # Classify based on energy and valence with more lenient thresholds
+        if energy > 0.7:  # High energy
+            if valence > 0.6:
+                return "dance"     # High energy, positive (dance/party songs)
+            elif valence > 0.4:
+                return "peppy"     # High energy, neutral (mass songs)
+            else:
+                return "mass"      # High energy, low valence (intense songs)
+        elif energy > 0.5:  # Medium energy
+            if valence > 0.6:
+                return "romantic"  # Medium energy, positive (romantic songs)
+            elif valence > 0.4:
+                return "melodic"   # Medium energy, neutral (melodic songs)
+            else:
+                return "melancholic"  # Medium energy, negative (sad songs)
+        else:  # Low energy
+            if valence > 0.6:
+                return "romantic"  # Low energy, positive (soft romantic)
+            else:
+                return "melancholic"  # Low energy, negative (sad songs)
     
-    parser = argparse.ArgumentParser(description = "DCM Playlist Generator") 
-    parser.add_argument('features_file', help = 'Path to the features file') 
-    parser.add_argument('output_file', help = "Path to save the playlist") 
-    parser.add_argument('songs', nargs = "+" , help = 'List of seed songs') 
-    parser.add_argument('--max-songs', type = int, default = 20, help = "Maximum number of songs in the playlist") 
-    parser.add_argument("--no-shuffle", action = 'store_false', dest = 'shuffle', help = 'Disable shuffling') 
-    parser.add_argument('--status', action = 'store_false', dest = 'dynamic', help = "Disable dynamic song addition") 
+    def get_genre(self, file_path: str) -> str:
+        """Extract genre from file path or metadata for Indian music.
     
-    args = parser.parse_args() 
+        Args:
+            file_path: Path to the audio file
+        
+        Returns:
+            str: Genre of the song (e.g., 'film', 'devotional', 'classical', 'folk', 'ghazal', 'item_song')
+        """
+        path = Path(file_path).name.lower()
     
-    try :
-        generator = PlaylistGenerator(args.features_file) 
+        # Common Indian music genres
+        if any(term in path for term in ['item', 'remix', 'dj', 'party']):
+            return 'party'
+        elif any(term in path for term in ['bhakti', 'devotional', 'bhajan', 'suprabhata']):
+            return 'devotional'
+        elif any(term in path for term in ['carnatic', 'karnatak', 'hindustani', 'classical']):
+            return 'classical'
+        elif any(term in path for term in ['folk', 'janapada', 'lavani', 'dandiya', 'garba']):
+            return 'folk'
+        elif any(term in path for term in ['ghazal', 'sufi', 'qawwali']):
+            return 'ghazal'
+        elif any(term in path for term in ['melody', 'romantic', 'love']):
+            return 'melody'
+        elif any(term in path for term in ['sad', 'heartbreak']):
+            return 'sad'
+        elif any(term in path for term in ['mass', 'peppy', 'dance']):
+            return 'dance'
+        else:
+            return 'film'  # Default to film music (most common in Indian music)
+    
+def main():
+    """Command-line interface for playlist generation."""
+    parser = argparse.ArgumentParser(
+        description="🎵 Generate playlists with similar song recommendations"
+    )
+    parser.add_argument("features_file", help="Path to features CSV file")
+    parser.add_argument("output_file", help="Path to save the playlist")
+    parser.add_argument("songs", nargs="+", help="Seed song paths")
+    parser.add_argument("--name", help="Playlist name")
+    parser.add_argument("--max-songs", type=int, default=20, 
+                       help="Maximum songs in playlist")
+    parser.add_argument("--no-shuffle", action="store_false", dest="shuffle",
+                       help="Don't shuffle the playlist")
+    parser.add_argument("--static", action="store_false", dest="dynamic",
+                       help="Disable dynamic song addition")
+    parser.add_argument("--genre", help="Filter by genre (e.g., 'rock', 'pop')")
+    parser.add_argument("--mood", help="Filter by mood (e.g., 'energetic', 'chill')")
+    parser.add_argument("--debug", action="store_true", 
+                       help="Enable debug logging")
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    try:
+        generator = PlaylistGenerator(args.features_file)
         success = generator.generate_playlist(
             args.songs,
-            args.output_file, 
-            max_songs = args.max_songs, 
-            shuffle = args.shuffle, 
-            dynamic = args.dynamic 
+            args.output_file,
+            playlist_name=args.name,
+            max_songs=args.max_songs,
+            shuffle=args.shuffle,
+            dynamic=args.dynamic,
+            genre=args.genre,
+            mood=args.mood
         )
-        sys.exit(0 if success else 1) 
-    except Exception as e :
-        print(f"Error : {e}", file_sus.stderr) 
-        sys.exit(1)
-if __name__ == '__main__': 
-    main() 
+        return 0 if success else 1
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+        return 1
