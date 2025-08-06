@@ -104,4 +104,28 @@ htmlcov/
 .nox/
 
 
-test_playlists/
+test_playlists/ 
+
+# Virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Logs and databases
+logs/
+*.log
+
+# Local development
+.vscode/
+.idea/
+.DS_Store
