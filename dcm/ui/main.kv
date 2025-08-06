@@ -1,0 +1,53 @@
+#: kivy 2.1.0 
+
+<MainScreen>:
+    MDBoxLayout:
+        orientation: 'vertical'
+
+        MDTopAppBar:
+            title: "DCM Playlist Generator"
+            elevation : 10     
+            left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]] 
+        
+        MDBottomNavigation:
+            MDBottomNavigationItem:
+                name: 'playlist'
+                text: 'Playlists' 
+                icon: 'playlist-music' 
+
+                MDLabel:
+                    text: 'Your Playlists'
+                    halign: 'center'
+                    font_style: 'H4' 
+            
+            MDBottomNavigationItem:
+                name: 'library' 
+                text: 'Library' 
+                icon : 'music' 
+
+                MDLabel:
+                    text: 'Music Library' 
+                    halign: 'center' 
+                    font_style: 'H4' 
+            
+            MDBottomNavigationItem: 
+                name: 'generate' 
+                text: 'Generate' 
+                icon: 'playlist-plus' 
+
+                MDBoxLayout: 
+                    orientation: 'vertical' 
+                    padding: 20 
+                    spacing: 20 
+
+                    MDLabel:
+                        text: 'Generate Playlist' 
+                        halign: 'center' 
+                        font_style: 'H4' 
+
+                    MDRaisedButton: 
+                        text: 'Generate Playlist' 
+                        size_hint: 1 None 
+                        height : '48dp' 
+                        pos_hint: {'center_x': 0.5} 
+                        on_release: app.generate_playlist()                
