@@ -1,53 +1,127 @@
-#:kivy 2.1.0 
+#:kivy 2.1.0
+#:import MDButton kivymd.uix.button.MDButton
+#:import MDLabel kivymd.uix.label.MDLabel
+#:import ScreenManager kivy.uix.screenmanager.ScreenManager
+#:import Screen kivy.uix.screenmanager.Screen
+#:import BoxLayout kivy.uix.boxlayout.BoxLayout
+#:import Button kivy.uix.button.Button
 
 <MainScreen>:
-    MDBoxLayout:
+    name: 'main_screen'
+    
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1  # White background
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    BoxLayout:
         orientation: 'vertical'
+        spacing: 0
 
-        MDTopAppBar:
-            title: "DCM Playlist Generator"
-            elevation: 10     
-            left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]] 
-        
-        MDBottomNavigation:
-            MDBottomNavigationItem:
-                name: 'playlist'
-                text: 'Playlists' 
-                icon: 'playlist-music' 
+        # Main content area
+        ScreenManager:
+            id: screen_manager
 
-                MDLabel:
-                    text: 'Your Playlists'
-                    halign: 'center'
-                    font_style: 'H4' 
-            
-            MDBottomNavigationItem:
-                name: 'library' 
-                text: 'Library' 
-                icon: 'music' 
-
-                MDLabel:
-                    text: 'Music Library'
-                    halign: 'center'
-                    font_style: 'H4' 
-            
-            MDBottomNavigationItem: 
-                name: 'generate' 
-                text: 'Generate' 
-                icon: 'playlist-plus' 
-
-                MDBoxLayout: 
-                    orientation: 'vertical' 
-                    padding: 20 
-                    spacing: 20 
-
+            # Playlists Screen
+            Screen:
+                name: 'playlists_screen'
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    
                     MDLabel:
-                        text: 'Generate Playlist' 
-                        halign: 'center' 
-                        font_style: 'H4' 
+                        text: 'Your Playlists'
+                        halign: 'center'
+                        font_size: '24sp'
+                        theme_text_color: 'Primary'
+                        bold: True
+                    
+                    MDLabel:
+                        text: 'Your playlists will appear here'
+                        halign: 'center'
+                        theme_text_color: 'Secondary'
 
-                    MDRaisedButton: 
-                        text: 'Generate Playlist' 
-                        size_hint: 1, None 
-                        height: '48dp' 
-                        pos_hint: {'center_x': 0.5} 
-                        on_release: app.generate_playlist()
+            # Library Screen
+            Screen:
+                name: 'library_screen'
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    
+                    MDLabel:
+                        text: 'Music Library'
+                        halign: 'center'
+                        font_size: '24sp'
+                        theme_text_color: 'Primary'
+                        bold: True
+                    
+                    MDLabel:
+                        text: 'Your music library will appear here'
+                        halign: 'center'
+                        theme_text_color: 'Secondary'
+
+            # Generate Screen
+            Screen:
+                name: 'generate_screen'
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    spacing: '20dp'
+                    
+                    MDLabel:
+                        text: 'Generate Playlist'
+                        halign: 'center'
+                        font_size: '24sp'
+                        theme_text_color: 'Primary'
+                        bold: True
+                    
+                    MDLabel:
+                        text: 'Generate a new playlist based on your preferences'
+                        halign: 'center'
+                        theme_text_color: 'Secondary'
+                    
+                    MDButton:
+                        text: 'Generate Playlist'
+                        size_hint: 1, None
+                        height: '48dp'
+                        md_bg_color: app.theme_cls.primaryColor
+                        theme_text_color: 'Custom'
+                        text_color: 1, 1, 1, 1
+                        on_release: print('Generate playlist button pressed')
+
+        # Custom Navigation Bar
+        BoxLayout:
+            size_hint_y: None
+            height: '56dp'
+            canvas.before:
+                Color:
+                    rgba: 0.13, 0.59, 0.95, 1  # Blue color
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+            
+            # Playlists Button
+            Button:
+                text: 'Playlists'
+                background_normal: ''
+                background_color: 0.13, 0.59, 0.95, 1  # Blue color
+                color: 1, 1, 1, 1
+                on_release: root.switch_screen('playlists_screen')
+            
+            # Library Button
+            Button:
+                text: 'Library'
+                background_normal: ''
+                background_color: 0.13, 0.59, 0.95, 1  # Blue color
+                color: 1, 1, 1, 1
+                on_release: root.switch_screen('library_screen')
+            
+            # Generate Button
+            Button:
+                text: 'Generate'
+                background_normal: ''
+                background_color: 0.13, 0.59, 0.95, 1  # Blue color
+                color: 1, 1, 1, 1
+                on_release: root.switch_screen('generate_screen')
