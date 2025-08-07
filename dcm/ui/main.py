@@ -9,8 +9,19 @@ import os
 # Import the MainScreen class 
 from dcm.ui.main_screen import MainScreen  
 
-Window.size = (800, 600) # Set window size 
-
+from kivy.utils import platform 
+# Setting the window size based on platform 
+if platform in ['win', 'linux', 'macosx', 'unknown']:
+    Window.size = (800, 600) 
+    
+    Window.mininum_width, Window.mininum_height = Window.size 
+else:
+    # App will take full screen on Mobile 
+    from kivy.config import Config 
+    Config.set('kivy', 'exit_on_escape', '0') 
+    from kivy.core.window import Window 
+    Window.maximize() 
+    
 class DCMApp(MDApp): 
     def build(self):
         self.theme_cls.primary_palette = "Teal" 
