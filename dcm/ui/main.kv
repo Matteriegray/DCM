@@ -1,4 +1,4 @@
-#: kivy 2.1.0 
+#:kivy 2.1.0 
 
 <MainScreen>:
     MDBoxLayout:
@@ -6,7 +6,7 @@
 
         MDTopAppBar:
             title: "DCM Playlist Generator"
-            elevation : 10     
+            elevation: 10     
             left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]] 
         
         MDBottomNavigation:
@@ -23,11 +23,11 @@
             MDBottomNavigationItem:
                 name: 'library' 
                 text: 'Library' 
-                icon : 'music' 
+                icon: 'music' 
 
                 MDLabel:
-                    text: 'Music Library' 
-                    halign: 'center' 
+                    text: 'Music Library'
+                    halign: 'center'
                     font_style: 'H4' 
             
             MDBottomNavigationItem: 
@@ -47,7 +47,7 @@
 
                     MDRaisedButton: 
                         text: 'Generate Playlist' 
-                        size_hint: 1 None 
-                        height : '48dp' 
+                        size_hint: 1, None 
+                        height: '48dp' 
                         pos_hint: {'center_x': 0.5} 
-                        on_release: app.generate_playlist()                
+                        on_release: app.generate_playlist()

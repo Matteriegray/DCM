@@ -1,13 +1,28 @@
+import sys 
+from pathlib import Path 
+sys.path.append(str(Path(__file__).parent.parent.parent)) 
 from kivymd.app import MDApp 
 from kivy.lang import Builder 
 from kivy.core.window import Window 
+import os  
+
+# Import the MainScreen class 
+from dcm.ui.main_screen import MainScreen  
+
+Window.size = (800, 600) # Set window size 
 
 class DCMApp(MDApp): 
     def build(self):
-        self.theme_cls.primary_palette = "Text" 
+        self.theme_cls.primary_palette = "Teal" 
         self.theme_cls.theme_style = 'Dark' 
-        self.title = 'DCM Playlist generator' 
-        return Builder.load_file('dcm/ui/main.kv') 
+        self.title = 'DCM Playlist Generator' 
+        
+        # Load the KV file 
+        kv_path = os.path.join(os.path.dirname(__file__), 'main.kv')
+        Builder.load_file(kv_path) 
+        
+        # Create and return mai screen 
+        return MainScreen() 
 
 if __name__ == '__main__':
     DCMApp().run() 
