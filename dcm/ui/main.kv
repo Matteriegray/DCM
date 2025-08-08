@@ -5,6 +5,12 @@
 #:import Screen kivy.uix.screenmanager.Screen
 #:import BoxLayout kivy.uix.boxlayout.BoxLayout
 #:import Button kivy.uix.button.Button
+#:import MDTextField kivymd.uix.textfield.MDTextField
+#:import MDCheckbox kivymd.uix.selectioncontrol.MDCheckbox
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
+#:import MDRaisedButton kivymd.uix.button.MDRaisedButton
+#:import MDList kivymd.uix.list.MDList
+#:import ScrollView kivy.uix.scrollview.ScrollView
 
 <MainScreen>:
     name: 'main_screen'
@@ -77,19 +83,89 @@
                         theme_text_color: 'Primary'
                         bold: True
                     
+                    # Playlist Name Input
+                    MDTextField:
+                        id: playlist_name
+                        hint_text: 'Enter playlist name'
+                        helper_text: 'Name your playlist'
+                        helper_text_mode: 'on_focus'
+                        size_hint_x: 0.8
+                        pos_hint: {'center_x': 0.5}
+                        
+                    # Mood Selection
                     MDLabel:
-                        text: 'Generate a new playlist based on your preferences'
-                        halign: 'center'
-                        theme_text_color: 'Secondary'
+                        text: 'Select Mood:'
+                        halign: 'left'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        
+                    MDBoxLayout:
+                        adaptive_width: True
+                        spacing: '10dp'
+                        pos_hint: {'center_x': 0.5}
+                        
+                        MDCheckbox:
+                            id: happy_check
+                            group: 'mood'
+                            size_hint: None, None
+                            size: dp(48), dp(48)
+                        MDLabel:
+                            text: 'Happy'
+                            theme_text_color: 'Primary'
+                            
+                        MDCheckbox:
+                            id: sad_check
+                            group: 'mood'
+                            size_hint: None, None
+                            size: dp(48), dp(48)
+                        MDLabel:
+                            text: 'Sad'
+                            theme_text_color: 'Primary'
+                            
+                        MDCheckbox:
+                            id: energetic_check
+                            group: 'mood'
+                            size_hint: None, None
+                            size: dp(48), dp(48)
+                        MDLabel:
+                            text: 'Energetic'
+                            theme_text_color: 'Primary'
                     
-                    MDButton:
+                    # Song Input
+                    MDLabel:
+                        text: 'Add Songs (Optional):'
+                        halign: 'left'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        
+                    MDRaisedButton:
+                        id: add_songs_btn
+                        text: 'Select Songs'
+                        on_release: app.file_manager_open()
+                        size_hint: None, None
+                        size: '200dp', '48dp'
+                        pos_hint: {'center_x': 0.5}
+                    
+                    # Generate Button
+                    MDRaisedButton:
+                        id: generate_btn
                         text: 'Generate Playlist'
-                        size_hint: 1, None
-                        height: '48dp'
+                        on_release: app.generate_playlist()
+                        size_hint_x: 0.8
+                        pos_hint: {'center_x': 0.5}
                         md_bg_color: app.theme_cls.primaryColor
-                        theme_text_color: 'Custom'
-                        text_color: 1, 1, 1, 1
-                        on_release: print('Generate playlist button pressed')
+                        
+                    # Generated Playlist Section
+                    MDLabel:
+                        text: 'Generated Playlist:'
+                        halign: 'left'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        
+                    ScrollView:
+                        MDList:
+                            id: playlist_items
+                            spacing: '10dp'
 
         # Custom Navigation Bar
         BoxLayout:
