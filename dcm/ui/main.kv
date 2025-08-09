@@ -8,7 +8,7 @@
 #:import MDTextField kivymd.uix.textfield.MDTextField
 #:import MDCheckbox kivymd.uix.selectioncontrol.MDCheckbox
 #:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
-#:import MDRaisedButton kivymd.uix.button.MDRaisedButton
+
 #:import MDList kivymd.uix.list.MDList
 #:import ScrollView kivy.uix.scrollview.ScrollView
 
@@ -95,41 +95,76 @@
                     # Mood Selection
                     MDLabel:
                         text: 'Select Mood:'
-                        halign: 'left'
                         size_hint_y: None
-                        height: self.texture_size[1]
-                        
-                    MDBoxLayout:
-                        adaptive_width: True
+                        height: '40dp'
+                        font_size: '16sp'
+                        bold: True
+                        theme_text_color: 'Primary'
+                                            # Mood Checkboxes
+                    GridLayout:
+                        id: mood_checkboxes
+                        cols: 2
                         spacing: '10dp'
-                        pos_hint: {'center_x': 0.5}
+                        padding: '10dp'
+                        size_hint_y: None
+                        height: '120dp'
                         
-                        MDCheckbox:
-                            id: happy_check
-                            group: 'mood'
-                            size_hint: None, None
-                            size: dp(48), dp(48)
-                        MDLabel:
-                            text: 'Happy'
-                            theme_text_color: 'Primary'
-                            
-                        MDCheckbox:
-                            id: sad_check
-                            group: 'mood'
-                            size_hint: None, None
-                            size: dp(48), dp(48)
-                        MDLabel:
-                            text: 'Sad'
-                            theme_text_color: 'Primary'
-                            
-                        MDCheckbox:
-                            id: energetic_check
-                            group: 'mood'
-                            size_hint: None, None
-                            size: dp(48), dp(48)
-                        MDLabel:
-                            text: 'Energetic'
-                            theme_text_color: 'Primary'
+                        # Happy
+                        BoxLayout:
+                            orientation: 'horizontal'
+                            size_hint_x: 0.5
+                            CheckBox:
+                                id: happy_check
+                                size_hint: None, None
+                                size: '30dp', '30dp'
+                                active: True
+                                group: 'mood'
+                            Label:
+                                text: 'Happy'
+                                size_hint_x: 0.8
+                                color: 0, 0, 0, 1
+                                
+                        # Sad
+                        BoxLayout:
+                            orientation: 'horizontal'
+                            size_hint_x: 0.5
+                            CheckBox:
+                                id: sad_check
+                                size_hint: None, None
+                                size: '30dp', '30dp'
+                                group: 'mood'
+                            Label:
+                                text: 'Sad'
+                                size_hint_x: 0.8
+                                color: 0, 0, 0, 1
+                        
+                        # Energetic
+                        BoxLayout:
+                            orientation: 'horizontal'
+                            size_hint_x: 0.5
+                            CheckBox:
+                                id: energetic_check
+                                size_hint: None, None
+                                size: '30dp', '30dp'
+                                group: 'mood'
+                            Label:
+                                text: 'Energetic'
+                                size_hint_x: 0.8
+                                color: 0, 0, 0, 1
+                                
+                        # Calm
+                        BoxLayout:
+                            orientation: 'horizontal'
+                            size_hint_x: 0.5
+                            CheckBox:
+                                id: calm_check
+                                size_hint: None, None
+                                size: '30dp', '30dp'
+                                group: 'mood'
+                            Label:
+                                text: 'Calm'
+                                size_hint_x: 0.8
+                                color: 0, 0, 0, 1
                     
                     # Song Input
                     MDLabel:
@@ -138,22 +173,54 @@
                         size_hint_y: None
                         height: self.texture_size[1]
                         
-                    MDRaisedButton:
+                    Button:
                         id: add_songs_btn
                         text: 'Select Songs'
                         on_release: app.file_manager_open()
                         size_hint: None, None
                         size: '200dp', '48dp'
                         pos_hint: {'center_x': 0.5}
+                        background_color: 0, 0, 0, 0  # Transparent background
+                        color: 0.13, 0.59, 0.95, 1  # Blue text
+                        font_size: '16sp'
+                        bold: True
+                        canvas.before:
+                            Color:
+                                rgba: 0.95, 0.95, 0.95, 1  # Light gray background
+                            RoundedRectangle:
+                                size: self.size
+                                pos: self.pos
+                                radius: [24,]
+                            Color:
+                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
+                            Line:
+                                width: 1.5
+                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
                     
                     # Generate Button
-                    MDRaisedButton:
+                    Button:
                         id: generate_btn
                         text: 'Generate Playlist'
                         on_release: app.generate_playlist()
-                        size_hint_x: 0.8
+                        size_hint: 0.8, None
+                        height: '48dp'
                         pos_hint: {'center_x': 0.5}
-                        md_bg_color: app.theme_cls.primaryColor
+                        background_color: 0, 0, 0, 0  # Transparent background
+                        color: 1, 1, 1, 1  # White text
+                        font_size: '16sp'
+                        bold: True
+                        canvas.before:
+                            Color:
+                                rgba: 0.13, 0.59, 0.95, 1  # Blue background
+                            RoundedRectangle:
+                                size: self.size
+                                pos: self.pos
+                                radius: [24,]
+                            Color:
+                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
+                            Line:
+                                width: 1.5
+                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
                         
                     # Generated Playlist Section
                     MDLabel:
@@ -171,33 +238,65 @@
         BoxLayout:
             size_hint_y: None
             height: '56dp'
+            padding: '5dp'
+            spacing: '5dp'
             canvas.before:
                 Color:
-                    rgba: 0.13, 0.59, 0.95, 1  # Blue color
+                    rgba: 0.13, 0.59, 0.95, 1
                 Rectangle:
-                    pos: self.pos
                     size: self.size
+                    pos: self.pos
             
             # Playlists Button
             Button:
+                id: playlists_btn
                 text: 'Playlists'
-                background_normal: ''
-                background_color: 0.13, 0.59, 0.95, 1  # Blue color
-                color: 1, 1, 1, 1
                 on_release: root.switch_screen('playlists_screen')
+                size_hint_x: 1
+                background_color: 0.13, 0.59, 0.95, 1
+                color: 1, 1, 1, 1
+                font_size: '14sp'
+                bold: True
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        size: self.size
+                        pos: self.pos
+                        radius: [5,]
             
             # Library Button
             Button:
+                id: library_btn
                 text: 'Library'
-                background_normal: ''
-                background_color: 0.13, 0.59, 0.95, 1  # Blue color
-                color: 1, 1, 1, 1
                 on_release: root.switch_screen('library_screen')
+                size_hint_x: 1
+                background_color: 0.13, 0.59, 0.95, 1
+                color: 1, 1, 1, 1
+                font_size: '14sp'
+                bold: True
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        size: self.size
+                        pos: self.pos
+                        radius: [5,]
             
             # Generate Button
             Button:
+                id: generate_btn_nav
                 text: 'Generate'
-                background_normal: ''
-                background_color: 0.13, 0.59, 0.95, 1  # Blue color
-                color: 1, 1, 1, 1
                 on_release: root.switch_screen('generate_screen')
+                size_hint_x: 1
+                background_color: 0.13, 0.59, 0.95, 1
+                color: 1, 1, 1, 1
+                font_size: '14sp'
+                bold: True
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        size: self.size
+                        pos: self.pos
+                        radius: [5,]
