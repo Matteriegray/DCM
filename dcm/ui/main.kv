@@ -68,39 +68,95 @@
                         halign: 'center'
                         theme_text_color: 'Secondary'
 
-            # Generate Screen
+            # Song Recommendation Screen
             Screen:
-                name: 'generate_screen'
+                name: 'recommend_screen'
                 BoxLayout:
                     orientation: 'vertical'
                     padding: '20dp'
                     spacing: '20dp'
                     
                     MDLabel:
-                        text: 'Generate Playlist'
+                        text: 'Discover Similar Songs'
                         halign: 'center'
                         font_size: '24sp'
                         theme_text_color: 'Primary'
                         bold: True
                     
-                    # Playlist Name Input
-                    MDTextField:
-                        id: playlist_name
-                        hint_text: 'Enter playlist name'
-                        helper_text: 'Name your playlist'
-                        helper_text_mode: 'on_focus'
-                        size_hint_x: 0.8
-                        pos_hint: {'center_x': 0.5}
-                        
-                    # Mood Selection
-                    MDLabel:
-                        text: 'Select Mood:'
+                    # Selected Song Display
+                    BoxLayout:
+                        orientation: 'vertical'
                         size_hint_y: None
-                        height: '40dp'
+                        height: '100dp'
+                        spacing: '10dp'
+                        padding: '10dp'
+                        canvas.before:
+                            Color:
+                                rgba: 0.95, 0.95, 0.95, 1  # Light gray background
+                            RoundedRectangle:
+                                size: self.size
+                                pos: self.pos
+                                radius: [10,]
+                        
+                        MDLabel:
+                            text: 'Selected Song:'
+                            size_hint_y: None
+                            height: '30dp'
+                            font_size: '16sp'
+                            bold: True
+                            theme_text_color: 'Secondary'
+                            
+                        MDLabel:
+                            id: selected_song_label
+                            text: 'No song selected'
+                            size_hint_y: None
+                            height: '30dp'
+                            font_size: '18sp'
+                            halign: 'center'
+                            theme_text_color: 'Primary'
+                    
+                    # Select Song Button
+                    Button:
+                        id: select_song_btn
+                        text: 'Select a Song'
+                        size_hint: (0.6, None)
+                        height: '48dp'
+                        pos_hint: {'center_x': 0.5}
+                        background_color: [0.13, 0.59, 0.95, 1]  # Blue background
+                        color: [1, 1, 1, 1]  # White text
                         font_size: '16sp'
                         bold: True
+                        on_release: app.file_manager_open()
+                    
+                    # Recommended Songs Section
+                    MDLabel:
+                        text: 'Recommended Songs:'
+                        size_hint_y: None
+                        height: '40dp'
+                        font_size: '18sp'
+                        bold: True
                         theme_text_color: 'Primary'
-                                            # Mood Checkboxes
+                    
+                    # Recommended Songs List
+                    ScrollView:
+                        size_hint: (1, 1)
+                        do_scroll_x: False
+                        do_scroll_y: True
+                        
+                        MDList:
+                            id: recommended_songs_list
+                            size_hint_y: None
+                            height: self.minimum_height
+                            spacing: '10dp'
+                            padding: '10dp'
+                            
+                            # This will be populated dynamically
+                            MDLabel:
+                                text: 'Select a song to see recommendations'
+                                halign: 'center'
+                                theme_text_color: 'Secondary'
+                                size_hint_y: None
+                                height: '40dp'
                     GridLayout:
                         id: mood_checkboxes
                         cols: 2
@@ -287,7 +343,7 @@
             Button:
                 id: generate_btn_nav
                 text: 'Generate'
-                on_release: root.switch_screen('generate_screen')
+                on_release: root.switch_screen('recommend_screen')
                 size_hint_x: 1
                 background_color: 0.13, 0.59, 0.95, 1
                 color: 1, 1, 1, 1
