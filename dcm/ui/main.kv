@@ -68,7 +68,7 @@
                         halign: 'center'
                         theme_text_color: 'Secondary'
 
-            # Song Recommendation Screen
+            # Song Recommendation Screen (Spotify-like)
             Screen:
                 name: 'recommend_screen'
                 BoxLayout:
@@ -128,6 +128,31 @@
                         bold: True
                         on_release: app.file_manager_open()
                     
+                    # Generate Recommendations Button
+                    Button:
+                        id: recommend_btn
+                        text: 'Get Recommendations'
+                        on_release: app.generate_playlist()
+                        size_hint: 0.8, None
+                        height: '48dp'
+                        pos_hint: {'center_x': 0.5}
+                        background_color: 0, 0, 0, 0  # Transparent background
+                        color: 1, 1, 1, 1  # White text
+                        font_size: '16sp'
+                        bold: True
+                        canvas.before:
+                            Color:
+                                rgba: 0.13, 0.59, 0.95, 1  # Blue background
+                            RoundedRectangle:
+                                size: self.size
+                                pos: self.pos
+                                radius: [24,]
+                            Color:
+                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
+                            Line:
+                                width: 1.5
+                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
+                    
                     # Recommended Songs Section
                     MDLabel:
                         text: 'Recommended Songs:'
@@ -152,11 +177,36 @@
                             
                             # This will be populated dynamically
                             MDLabel:
-                                text: 'Select a song to see recommendations'
+                                text: 'Select a song and click "Get Recommendations"'
                                 halign: 'center'
                                 theme_text_color: 'Secondary'
                                 size_hint_y: None
                                 height: '40dp'
+            
+            # Mood-based Playlist Generation Screen
+            Screen:
+                name: 'generate_screen'
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    spacing: '20dp'
+                    
+                    MDLabel:
+                        text: 'Generate Playlist by Mood'
+                        halign: 'center'
+                        font_size: '24sp'
+                        theme_text_color: 'Primary'
+                        bold: True
+                    
+                    # Mood Selection
+                    MDLabel:
+                        text: 'Select Mood:'
+                        size_hint_y: None
+                        height: '40dp'
+                        font_size: '18sp'
+                        bold: True
+                        theme_text_color: 'Primary'
+                    
                     GridLayout:
                         id: mood_checkboxes
                         cols: 2
@@ -339,13 +389,31 @@
                         pos: self.pos
                         radius: [5,]
             
+            # Recommend Button
+            Button:
+                id: recommend_btn_nav
+                text: 'Recommend'
+                on_release: root.switch_screen('recommend_screen')
+                size_hint_x: 1
+                background_color: 0.13, 0.59, 0.95, 1
+                color: 1, 1, 1, 1
+                font_size: '14sp'
+                bold: True
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        size: self.size
+                        pos: self.pos
+                        radius: [5,]
+            
             # Generate Button
             Button:
                 id: generate_btn_nav
                 text: 'Generate'
-                on_release: root.switch_screen('recommend_screen')
+                on_release: root.switch_screen('generate_screen')
                 size_hint_x: 1
-                background_color: 0.13, 0.59, 0.95, 1
+                background_color: 0.07, 0.45, 0.85, 1  # Slightly darker blue
                 color: 1, 1, 1, 1
                 font_size: '14sp'
                 bold: True
