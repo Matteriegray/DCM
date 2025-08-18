@@ -34,6 +34,7 @@ ENV/
 
 # Project specific
 DATA/
+music_library/
 features/
 models/
 *.csv
@@ -45,9 +46,22 @@ models/
 *.npz
 
 # Audio files
-*.mp3
-*.wav
+*.aif
+*.aiff
+*.aifc
+*.au
+*.flac
 *.m4a
+*.mp2
+*.mp3
+*.mp4
+*.m4p
+*.ogg
+*.oga
+*.wav
+*.wma
+*.wv
+*.webm
 *.flac
 *.ogg
 
