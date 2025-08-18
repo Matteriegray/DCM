@@ -1,492 +1,262 @@
-"""DCM playlist generator"""
+"""DCM Playlist Generator - Fixed Version"""
+
 import os
-import argparse
 import logging
 import random
 from pathlib import Path
-from typing import List, Optional , Dict, Union
-from numpy.random import rand
-import pandas as pd 
-from rich.console import Console
-from rich.progress import track 
-import numpy as np # Rich is used to imporve the UI in CLI
-# Set up logging 
+from typing import List, Optional, Dict, Union, Callable
 
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Set up logging
 logging.basicConfig(
-    level = logging.INFO,
-    format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Initializing the console
-console = Console()
-
-
-# Implementing the class of Playlist generator
 class PlaylistGenerator:
+    """Generates playlists based on audio features and similarity."""
+    
     def __init__(self, features_file: str):
-        # Initializes the playlist generator with song features
-        # Args : Path to the CSV  file containig song features
+        """Initialize with path to features CSV file."""
         self.features_df = None
-        self.load_features(features_file) 
-    def load_features(self, features_file : str): 
-        # Load the song features from a CSV file 
-        # Args : Path to the csv file 
-        try : 
-            # Checks if the file exists
+        self.load_features(features_file)
+    
+    def load_features(self, features_file: str) -> None:
+        """Load and validate features from CSV file."""
+        try:
             if not os.path.exists(features_file):
                 raise FileNotFoundError(f"Features file not found: {features_file}")
             
-            # Load file
             self.features_df = pd.read_csv(features_file)
-            # Check if empty
             
-            if self.features_df.empty: 
-                raise ValueError("Features file is empty") 
-            
-            required_columns = ['file_path'] 
-            for col in required_columns : 
+            if self.features_df.empty:
+                raise ValueError("Features file is empty")
+                
+            required_columns = ['file_path', 'tempo', 'energy', 'danceability']
+            for col in required_columns:
                 if col not in self.features_df.columns:
-                    raise ValueError(f"Missing required column in feaures files {col} ") 
+                    raise ValueError(f"Missing required column: {col}")
+                    
+            logger.info(f"Successfully loaded {len(self.features_df)} songs")
             
-            logger.info(f"Loaded features fror {len(self.features_df)} songs")
-        except pd.errors.EmptyDataError:
-            raise ValueError("Features file is empty") 
         except Exception as e:
-            logger.error(f"Error loading features file : {e} ") 
-            raise  
-        
-    def save_as_m3u(
-        self, 
-        song_paths: List[str],
-        output_file:str, 
-        playlist_name:Optional[str] = None 
-    ) -> bool:
-        # Saves the playlist as a M3U playlist   # Why M3U - is a Universal format and accepts all others like .mp3 , .m3a etc
-        """Args : song_paths: List of paths to songs
-           output_file : Path to save the playlist 
-           playlist_name 
-           
-           Returns : bool - True if successful , False otherwise"""
-        
-        try:
-            # Create a output directory 
-            output_path = Path(output_file) 
-            output_path.parent.mkdir(parents = True, exist_ok = True)  
-            
-            # Conversts all path to absolute paths 
-            abs_paths = [str(Path(path).resolve()) for path in song_paths] 
-            
-            # Write the playlist to a file 
-            with open(output_file, 'w', encoding='utf-8') as f:
-                # Write M3U header 
-                f.write("#EXTM3U\n") 
-                
-                # Write the playlist name ( if provided) 
-                if playlist_name:
-                    f.write(f"#PLAYLIST: {playlist_name}") 
-                
-                # Write the song path 
-                for song_path in abs_paths:
-                    f.write(f"#EXTINF: 0, {Path(song_path).stem}\n") 
-                    f.write(f"{song_path}\n")
-            logger.info(f"Playlist saved to {output_file}") 
-            return True 
-        except Exception as e:
-            logger.error(f"Error saving playlist: {e}") 
-            return False 
-        
+            logger.error(f"Error loading features: {str(e)}")
+            raise
+    
     def generate_playlist(
-        self, 
-        song_paths: List[str], 
+        self,
+        song_paths: List[str],
         output_file: str,
-        playlist_name: Optional[str] = None,
-        max_songs: int = 20, 
+        playlist_name: str = "My Playlist",
+        mood: Optional[str] = None,
+        max_songs: int = 20,
         shuffle: bool = True,
+        progress_callback: Optional[Callable[[float, str], bool]] = None,
         dynamic: bool = True,
-        genre: Optional[str] = None,
-        mood: Optional[str] = None
+        genre: Optional[str] = None
     ) -> bool:
-        """Generate a playlist with optional genre and mood filters."""
+        """Generate a playlist based on input songs and optional filters."""
+        def update_progress(progress: float, status: str) -> bool:
+            if progress_callback and not progress_callback(progress, status):
+                logger.info("Playlist generation cancelled by user")
+                return False
+            return True
+        
         try:
-            # Validate and convert paths
-            valid_songs = []
-            for song_path in song_paths:
-                abs_path = str(Path(song_path).resolve())
-                if not (self.features_df['file_path'] == abs_path).any():
-                    logger.warning(f"Song not found: {song_path}")
-                    continue
-                valid_songs.append(abs_path)
+            # Validate input
+            if not song_paths:
+                logger.error("No input songs provided")
+                return False
                 
+            if not update_progress(0.0, "Starting playlist generation..."):
+                return False
+            
+            # Convert to absolute paths
+            abs_paths = [str(Path(p).resolve()) for p in song_paths]
+            
+            # Filter valid songs
+            valid_songs = [p for p in abs_paths 
+                         if p in self.features_df['file_path'].values]
+            
             if not valid_songs:
-                logger.error("No valid songs found")
+                logger.error("No valid songs found in features")
+                update_progress(-1, "Error: No valid songs found")
                 return False
                 
             playlist = valid_songs.copy()
             
-            # Add similar songs if dynamic
-            if dynamic:
-                while len(playlist) < max_songs and len(playlist) < len(self.features_df):
-                    last_songs = playlist[-min(3, len(playlist)):]
-                    new_songs = []
+            # Add similar songs if needed
+            if dynamic and len(playlist) < max_songs:
+                if not update_progress(0.3, "Finding similar songs..."):
+                    return False
                     
-                    for song in last_songs:
-                        similar = self.find_similar_songs(
-                            song, 
-                            n=3,
-                            genre_filter=genre,
-                            mood_filter=mood
-                        )
-                        new_songs.extend([s for s in similar 
-                                       if s not in playlist and s not in new_songs])
-                        if len(playlist) + len(new_songs) >= max_songs:
-                            break
-                    
-                    if not new_songs:
+                # Use the last song as reference
+                reference_song = playlist[-1]
+                remaining = max_songs - len(playlist)
+                
+                # Find similar songs
+                similar = self.find_similar_songs(
+                    song_path=reference_song,
+                    n=remaining * 2,  # Get extra in case some are already in playlist
+                    genre_filter=genre,
+                    mood_filter=mood,
+                    exclude_paths=playlist
+                )
+                
+                # Add new songs to playlist
+                for song in similar:
+                    if len(playlist) >= max_songs:
                         break
-                        
-                    playlist.extend(new_songs[:max_songs - len(playlist)])
+                    if song not in playlist:
+                        playlist.append(song)
             
             # Shuffle if requested
-            if shuffle:
-                if dynamic:
-                    initial_songs = valid_songs.copy()
-                    random.shuffle(initial_songs)
-                    playlist = initial_songs + playlist[len(initial_songs):]
-                else:
-                    random.shuffle(playlist)
+            if shuffle and len(playlist) > 1:
+                if not update_progress(0.9, "Shuffling playlist..."):
+                    return False
+                first = playlist[0]
+                rest = playlist[1:]
+                random.shuffle(rest)
+                playlist = [first] + rest
             
-            return self.save_as_m3u(playlist[:max_songs], output_file, playlist_name)
+            # Save playlist
+            if not update_progress(0.95, "Saving playlist..."):
+                return False
+                
+            self.save_playlist(playlist, output_file, playlist_name)
+            update_progress(1.0, "Playlist generated successfully!")
+            return True
             
         except Exception as e:
-            logger.error(f"Error: {e}")
+            error_msg = f"Error generating playlist: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            update_progress(-1, f"Error: {error_msg[:50]}...")
             return False
     
-    def _get_song_index(self, song_path: str) -> Optional[int]:
-        """Helper to find a song index by filename or path.
-        
-        Args:
-            song_path: Path or filename of the song
-            
-        Returns:
-            Index of the song in the features dataframe, or None if not found
-        """
-        # Get just the filename
-        song_filename = str(Path(song_path).name)
-        
-        # First try matching the full path (if provided)
-        if Path(song_path).is_absolute():
-            matches = self.features_df['file_path'] == song_path
-            if matches.any():
-                return matches.idxmax()
-        
-        # Try matching just the filename in the file_path column
-        matches = self.features_df['file_path'].str.endswith(song_filename)
-        if matches.any():
-            return matches.idxmax()
-            
-        # Try case-insensitive filename match
-        matches = self.features_df['file_path'].str.lower().str.endswith(song_filename.lower())
-        if matches.any():
-            return matches.idxmax()
-            
-        # Try matching the filename with the file_name column if it exists
-        if 'file_name' in self.features_df.columns:
-            matches = self.features_df['file_name'] == song_filename
-            if matches.any():
-                return matches.idxmax()
-                
-            # Case-insensitive match with file_name
-            matches = self.features_df['file_name'].str.lower() == song_filename.lower()
-            if matches.any():
-                return matches.idxmax()
-        
-        logger.warning(f"Song not found in database: {song_path}")
-        logger.debug(f"Available songs: {self.features_df['file_path'].head().tolist()}")
-        return None
-        
     def find_similar_songs(
-        self, 
-        song_path: str, 
-        n: int = 5, 
+        self,
+        song_path: str,
+        n: int = 10,
         genre_filter: Optional[str] = None,
         mood_filter: Optional[str] = None,
-        mood_similarity_threshold: float = 0.7
+        exclude_paths: Optional[List[str]] = None
     ) -> List[str]:
-        """Find n songs similar to the given song with optional filters.
-        
-        Args:
-            song_path: Path or filename of the reference song
-            n: Number of similar songs to find
-            genre_filter: Optional genre to filter by
-            mood_filter: Optional mood to filter by
-            mood_similarity_threshold: Threshold for mood similarity (0-1)
-            
-        Returns:
-            List of paths to similar songs matching the filters
-        """
+        """Find songs similar to the given song."""
         try:
-            logger.debug(f"[DEBUG] Finding similar songs for: {song_path}")
-            song_idx = self._get_song_index(song_path)
-            
-            if song_idx is None:
-                logger.warning(f"[DEBUG] Song not found in database: {song_path}")
-                return []
-                
-            logger.debug(f"[DEBUG] Found song at index: {song_idx}")
+            # Get feature vectors
             features = self.get_feature_vectors()
             
-            # Debug logging for features
-            logger.debug(f"[DEBUG] Features shape: {features.shape if hasattr(features, 'shape') else 'N/A'}")
-            logger.debug(f"[DEBUG] Features type: {type(features)}")
-            
-            # Get similarity scores
-            from sklearn.metrics.pairwise import cosine_similarity
-            
-            # Ensure we have a 2D array for the reference song
-            try:
-                ref_song_features = features[song_idx:song_idx+1]  # This ensures 2D array with shape (1, n_features)
-                logger.debug(f"[DEBUG] Reference song features shape: {ref_song_features.shape if hasattr(ref_song_features, 'shape') else 'N/A'}")
-                
-                # Calculate similarities between reference song and all other songs
-                similarities = cosine_similarity(ref_song_features, features)
-                logger.debug(f"[DEBUG] Similarities shape: {similarities.shape if hasattr(similarities, 'shape') else 'N/A'}")
-                
-                # Flatten the similarities array if needed
-                if len(similarities.shape) > 1 and similarities.shape[0] == 1:
-                    similarities = similarities[0]
-                
-                logger.debug(f"[DEBUG] Final similarities shape: {similarities.shape if hasattr(similarities, 'shape') else 'N/A'}")
-                
-                # Get indices sorted by similarity (descending)
-                similar_indices = similarities.argsort()[::-1]
-                
-                # Filter and collect results
-                results = []
-                for idx in similar_indices:
-                    # Skip the reference song itself
-                    if idx == song_idx:
-                        continue
-                    
-                    # Get the song path and metadata
-                    song_row = self.features_df.iloc[idx]
-                    song_path = song_row['file_path']
-                    
-                    # Apply genre filter if specified
-                    if genre_filter and 'genre' in song_row and song_row['genre'] != genre_filter:
-                        logger.debug(f"Skipping {song_path} - genre mismatch")
-                        continue
-                    
-                    # Apply mood filter if specified
-                    if mood_filter:
-                        song_mood = self.classify_mood(song_row)
-                        mood_score = self._get_mood_similarity(mood_filter, song_mood)
-                        if mood_score < mood_similarity_threshold:
-                            logger.debug(f"Skipping {song_path} - mood mismatch ({song_mood} vs {mood_filter})")
-                            continue
-                    
-                    results.append(song_path)
-                    if len(results) >= n:
-                        break
-                
-                return results
-                
-            except Exception as e:
-                logger.error(f"[DEBUG] Error in similarity calculation: {e}", exc_info=True)
+            # Find index of reference song
+            ref_idx = self.features_df.index[self.features_df['file_path'] == song_path].tolist()
+            if not ref_idx:
+                logger.warning(f"Song not found in features: {song_path}")
                 return []
                 
-            logger.info(f"Found {len(results)} similar songs for {os.path.basename(song_path)}")
-            return results
+            ref_idx = ref_idx[0]
+            ref_features = features[ref_idx].reshape(1, -1)
+            
+            # Calculate similarities
+            similarities = cosine_similarity(ref_features, features).flatten()
+            
+            # Create results dataframe
+            results = self.features_df.copy()
+            results['similarity'] = similarities
+            
+            # Apply filters
+            if genre_filter:
+                results = results[results['genre'].str.lower() == genre_filter.lower()]
+                
+            if mood_filter:
+                results = results[results['mood'].str.lower() == mood_filter.lower()]
+                
+            if exclude_paths:
+                results = results[~results['file_path'].isin(exclude_paths)]
+            
+            # Sort by similarity and get top N
+            results = results.sort_values('similarity', ascending=False).head(n)
+            
+            return results['file_path'].tolist()
             
         except Exception as e:
-            logger.error(f"Error finding similar songs: {e}")
+            logger.error(f"Error finding similar songs: {str(e)}", exc_info=True)
             return []
-        
+    
     def get_feature_vectors(self) -> np.ndarray:
-        # Gets the feature vectors from the features dataframe and then normalizes it 
-        feature_columns = [col for col in self.features_df.columns 
-                           if col not in ['file_path', 'file_name', 'file_extension', 'file_size_mb']] 
-        features = self.features_df[feature_columns].values 
-        from sklearn.preprocessing import StandardScaler 
-        return StandardScaler().fit_transform(features) 
+        """Get normalized feature vectors."""
+        feature_cols = [c for c in self.features_df.columns 
+                       if c not in ['file_path', 'genre', 'mood'] 
+                       and pd.api.types.is_numeric_dtype(self.features_df[c])]
+        
+        features = self.features_df[feature_cols].values
+        return StandardScaler().fit_transform(features)
     
-    def classify_mood(self, features: np.ndarray) -> str:
-        """Classify the mood of a song based on its audio features.
-        
-        This implementation uses a combination of energy, valence, and other features
-        to determine the mood in a way that works across different music styles.
-        
-        Args:
-            features: Normalized feature vector of the song
-            
-        Returns:
-            str: Mood classification ('romantic', 'dance', 'devotional', 'melancholic', 'peppy', 'energetic')
-        """
+    def save_playlist(
+        self, 
+        song_paths: List[str], 
+        output_file: str, 
+        playlist_name: str = "My Playlist"
+    ) -> bool:
+        """Save playlist to file in M3U format."""
         try:
-            # Extract relevant features with bounds checking
-            energy = min(max(features[8], -1), 1)  # RMS mean (energy)
-            valence = min(max(features[50], -1), 1)  # Chroma mean (valence)
-            
-            # Get additional features if available
-            tempo = features[98] if len(features) > 98 else 0  # Tempo feature if available
-            
-            # Special case for devotional music (check filename first)
-            file_path = self.features_df.iloc[0]['file_path'].lower()
-            if any(term in file_path for term in ['bhajan', 'devotional', 'bhakti', 'suprabhata']):
-                return "devotional"
+            output_dir = os.path.dirname(output_file)
+            if output_dir and not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
                 
-            # Special case for sad songs (check filename)
-            if any(term in file_path for term in ['sad', 'heartbreak', 'dukkha']):
-                return "melancholic"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(f"#EXTM3U\n")
+                f.write(f"#PLAYLIST:{playlist_name}\n")
+                
+                for path in song_paths:
+                    f.write(f"#EXTINF:0,{os.path.basename(path)}\n")
+                    f.write(f"{path}\n")
             
-            # Normalize energy and valence to 0-1 range
-            energy_norm = (energy + 1) / 2  # Convert from -1:1 to 0:1
-            valence_norm = (valence + 1) / 2  # Convert from -1:1 to 0:1
+            logger.info(f"Playlist saved to {output_file}")
+            return True
             
-            # Classify based on energy and valence
-            if energy_norm > 0.7:
-                if valence_norm > 0.7:
-                    return "dance"
-                elif valence_norm > 0.5:
-                    return "peppy"
-                elif valence_norm > 0.3:
-                    return "energetic"
-                else:
-                    return "intense"
-                    
-            elif energy_norm > 0.4:
-                if valence_norm > 0.7:
-                    return "romantic"
-                elif valence_norm > 0.5:
-                    return "melodic"
-                elif valence_norm > 0.3:
-                    return "mellow"
-                else:
-                    return "melancholic"
-                    
-            else:  # Low energy
-                if valence_norm > 0.7:
-                    return "romantic"
-                elif valence_norm > 0.5:
-                    return "calm"
-                elif valence_norm > 0.3:
-                    return "mellow"
-                else:
-                    return "melancholic"
-                    
         except Exception as e:
-            logger.warning(f"Error in mood classification: {e}")
-            return "unknown"  # Default fallback
-            
-    def get_genre(self, file_path: str) -> str:
-        """Extract genre from file path or metadata for Indian music.
-        
-        Args:
-            file_path: Path to the audio file
-        
-        Returns:
-            str: Genre of the song (e.g., 'film', 'devotional', 'classical', 'folk', 'ghazal', 'item_song')
-        """
-        path = Path(file_path).name.lower()
-    
-        # Common Indian music genres
-        if any(term in path for term in ['item', 'remix', 'dj', 'party']):
-            return 'party'
-        elif any(term in path for term in ['bhakti', 'devotional', 'bhajan', 'suprabhata']):
-            return 'devotional'
-        elif any(term in path for term in ['carnatic', 'karnatak', 'hindustani', 'classical']):
-            return 'classical'
-        elif any(term in path for term in ['folk', 'janapada', 'lavani', 'dandiya', 'garba']):
-            return 'folk'
-        elif any(term in path for term in ['ghazal', 'sufi', 'qawwali']):
-            return 'ghazal'
-        elif any(term in path for term in ['melody', 'romantic', 'love']):
-            return 'melody'
-        elif any(term in path for term in ['sad', 'heartbreak']):
-            return 'sad'
-        elif any(term in path for term in ['mass', 'peppy', 'dance']):
-            return 'dance'
-        else:
-            return 'film'  # Default to film music (most common in Indian music)
-            
-    def _get_mood_similarity(self, mood1: str, mood2: str) -> float:
-        """Calculate similarity between two mood strings.
-        
-        Args:
-            mood1: First mood
-            mood2: Second mood
-            
-        Returns:
-            Similarity score between 0 and 1
-        """
-        # Define mood groups that are considered similar
-        mood_groups = {
-            'dance': {'dance', 'peppy', 'energetic', 'party'},
-            'romantic': {'romantic', 'melodic', 'calm', 'mellow'},
-            'melancholic': {'melancholic', 'sad', 'mellow'},
-            'energetic': {'energetic', 'dance', 'peppy', 'party'},
-            'devotional': {'devotional', 'spiritual'}
-        }
-        
-        mood1 = mood1.lower()
-        mood2 = mood2.lower()
-        
-        # Exact match
-        if mood1 == mood2:
-            return 1.0
-            
-        # Check if moods are in the same group
-        for group in mood_groups.values():
-            if mood1 in group and mood2 in group:
-                return 0.8  # High similarity for same group
-                
-        # No match
-        return 0.0
-    
+            logger.error(f"Error saving playlist: {str(e)}")
+            return False
+
 def main():
-    """Command-line interface for playlist generation"""
-    parser = argparse.ArgumentParser(
-        description="🎵 Generate playlists with similar song recommendations"
-    )
-    parser.add_argument("features_file", help="Path to features CSV file")
-    parser.add_argument("output_file", help="Path to save the playlist")
-    parser.add_argument("songs", nargs="+", help="Seed song paths")
-    parser.add_argument("--name", help="Playlist name")
-    parser.add_argument("--max-songs", type=int, default=20, 
-                       help="Maximum songs in playlist")
-    parser.add_argument("--no-shuffle", action="store_false", dest="shuffle",
-                       help="Don't shuffle the playlist")
-    parser.add_argument("--static", action="store_false", dest="dynamic",
-                       help="Disable dynamic song addition")
-    parser.add_argument("--genre", help="Filter by genre (e.g., 'rock', 'pop')")
-    parser.add_argument("--mood", help="Filter by mood (e.g., 'energetic', 'chill')")
-    parser.add_argument("--debug", action="store_true", 
-                       help="Enable debug logging")
+    """Command-line interface for playlist generation."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate playlists based on audio features')
+    parser.add_argument('songs', nargs='+', help='Input song paths')
+    parser.add_argument('-o', '--output', required=True, help='Output playlist file')
+    parser.add_argument('--name', default='My Playlist', help='Playlist name')
+    parser.add_argument('--mood', help='Filter by mood')
+    parser.add_argument('--genre', help='Filter by genre')
+    parser.add_argument('--max-songs', type=int, default=20, help='Maximum songs in playlist')
+    parser.add_argument('--no-shuffle', action='store_false', dest='shuffle', 
+                       help='Disable shuffling')
+    parser.add_argument('--features', required=True, help='Path to features CSV file')
     
     args = parser.parse_args()
     
-    # Configure logging
-    logging.basicConfig(
-        level=logging.DEBUG if args.debug else logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
     try:
-        generator = PlaylistGenerator(args.features_file)
+        generator = PlaylistGenerator(args.features)
         success = generator.generate_playlist(
-            args.songs,
-            args.output_file,
+            song_paths=args.songs,
+            output_file=args.output,
             playlist_name=args.name,
-            max_songs=args.max_songs,
-            shuffle=args.shuffle,
-            dynamic=args.dynamic,
+            mood=args.mood,
             genre=args.genre,
-            mood=args.mood
+            max_songs=args.max_songs,
+            shuffle=args.shuffle
         )
+        
         return 0 if success else 1
+        
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        if args.debug:
-            import traceback
-            traceback.print_exc()
+        logger.error(f"Error: {str(e)}")
         return 1
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
