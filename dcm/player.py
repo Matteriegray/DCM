@@ -23,6 +23,7 @@ class MusicPlayer(EventDispatcher):
         super().__init__(**kwargs)
         self.sound = None
         self._update_ev = None
+        self.on_song_end_callback = None  # Callback for when a song ends
         self.bind(volume=self._on_volume)
     
     def _on_volume(self, instance, value):
@@ -38,7 +39,12 @@ class MusicPlayer(EventDispatcher):
             # Check if song has ended
             if self.sound.state == 'stop' and self.current_position > 0 and \
                abs(self.duration - self.current_position) < 0.1:
+                # Store callback before calling next() as it might trigger a new song load
+                callback = self.on_song_end_callback
                 self.next()
+                # If we have a callback and the song ended naturally, call it
+                if callback and self.current_position > 0:
+                    callback()
     
     def load_song(self, file_path):
         """Load a song from file path."""
