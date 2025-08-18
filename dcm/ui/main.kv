@@ -1,276 +1,213 @@
 #:kivy 2.1.0
-#:import MDButton kivymd.uix.button.MDButton
-#:import MDLabel kivymd.uix.label.MDLabel
-#:import ScreenManager kivy.uix.screenmanager.ScreenManager
-#:import Screen kivy.uix.screenmanager.Screen
-#:import BoxLayout kivy.uix.boxlayout.BoxLayout
-#:import Button kivy.uix.button.Button
+#:import MDRaisedButton kivymd.uix.button.button.MDRaisedButton
+#:import MDLabel kivymd.uix.label.label.MDLabel
+#:import MDScreenManager kivymd.uix.screenmanager.MDScreenManager
+#:import MDScreen kivymd.uix.screen.MDScreen
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
 #:import MDTextField kivymd.uix.textfield.MDTextField
 #:import MDCheckbox kivymd.uix.selectioncontrol.MDCheckbox
-#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
-
 #:import MDList kivymd.uix.list.MDList
+#:import MDSwitch kivymd.uix.selectioncontrol.MDSwitch
+#:import MDSlider kivymd.uix.slider.MDSlider
 #:import ScrollView kivy.uix.scrollview.ScrollView
+#:import OneLineListItem kivymd.uix.list.OneLineListItem
+#:import TwoLineListItem kivymd.uix.list.TwoLineListItem
+#:import ThreeLineListItem kivymd.uix.list.ThreeLineListItem
+#:import IconLeftWidget kivymd.uix.list.IconLeftWidget
+#:import ImageLeftWidget kivymd.uix.list.ImageLeftWidget
 
 <MainScreen>:
     name: 'main_screen'
     
-    canvas.before:
-        Color:
-            rgba: 1, 1, 1, 1  # White background
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-    BoxLayout:
+    # Main container with a white background
+    MDBoxLayout:
         orientation: 'vertical'
         spacing: 0
-
-        # Main content area
-        ScreenManager:
+        padding: 0
+        
+        # Set background color
+        md_bg_color: 1, 1, 1, 1
+        
+        # Main content area with ScreenManager
+        MDScreenManager:
             id: screen_manager
-
+            
             # Playlists Screen
-            Screen:
+            MDScreen:
                 name: 'playlists_screen'
-                BoxLayout:
+                
+                MDBoxLayout:
                     orientation: 'vertical'
                     padding: '20dp'
+                    spacing: '20dp'
                     
                     MDLabel:
                         text: 'Your Playlists'
                         halign: 'center'
-                        font_size: '24sp'
+                        font_style: 'H5'
                         theme_text_color: 'Primary'
                         bold: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
                     
                     MDLabel:
                         text: 'Your playlists will appear here'
                         halign: 'center'
                         theme_text_color: 'Secondary'
-
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                    
+                    ScrollView:
+                        MDList:
+                            id: playlists_list
+                            spacing: '10dp'
+            
             # Library Screen
-            Screen:
+            MDScreen:
                 name: 'library_screen'
-                BoxLayout:
-                    orientation: 'vertical'
-                    padding: '20dp'
-                    
-                    MDLabel:
-                        text: 'Music Library'
-                        halign: 'center'
-                        font_size: '24sp'
-                        theme_text_color: 'Primary'
-                        bold: True
-                    
-                    MDLabel:
-                        text: 'Your music library will appear here'
-                        halign: 'center'
-                        theme_text_color: 'Secondary'
-
-            # Song Recommendation Screen (Spotify-like)
-            Screen:
-                name: 'recommend_screen'
-                BoxLayout:
+                
+                MDBoxLayout:
                     orientation: 'vertical'
                     padding: '20dp'
                     spacing: '20dp'
                     
                     MDLabel:
-                        text: 'Discover Similar Songs'
+                        text: 'Your Music Library'
                         halign: 'center'
-                        font_size: '24sp'
+                        font_style: 'H5'
                         theme_text_color: 'Primary'
                         bold: True
-                    
-                    # Selected Song Display
-                    BoxLayout:
-                        orientation: 'vertical'
                         size_hint_y: None
-                        height: '100dp'
-                        spacing: '10dp'
-                        padding: '10dp'
-                        canvas.before:
-                            Color:
-                                rgba: 0.95, 0.95, 0.95, 1  # Light gray background
-                            RoundedRectangle:
-                                size: self.size
-                                pos: self.pos
-                                radius: [10,]
-                        
-                        MDLabel:
-                            text: 'Selected Song:'
-                            size_hint_y: None
-                            height: '30dp'
-                            font_size: '16sp'
-                            bold: True
-                            theme_text_color: 'Secondary'
-                            
-                        MDLabel:
-                            id: selected_song_label
-                            text: 'No song selected'
-                            size_hint_y: None
-                            height: '30dp'
-                            font_size: '18sp'
-                            halign: 'center'
-                            theme_text_color: 'Primary'
+                        height: self.texture_size[1]
+                    
+                    ScrollView:
+                        MDList:
+                            id: library_list
+                            spacing: '10dp'
+            
+            # Recommend Screen
+            MDScreen:
+                name: 'recommend_screen'
+                
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    spacing: '20dp'
+                    
+                    MDLabel:
+                        text: 'Get Recommendations'
+                        halign: 'center'
+                        font_style: 'H5'
+                        theme_text_color: 'Primary'
+                        bold: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                    
+                    MDLabel:
+                        id: selected_song_label
+                        text: 'No song selected'
+                        size_hint_y: None
+                        height: '30dp'
+                        font_style: 'Subtitle1'
+                        halign: 'center'
+                        theme_text_color: 'Primary'
                     
                     # Select Song Button
-                    Button:
+                    MDRaisedButton:
                         id: select_song_btn
                         text: 'Select a Song'
                         size_hint: (0.6, None)
                         height: '48dp'
                         pos_hint: {'center_x': 0.5}
-                        background_color: [0.13, 0.59, 0.95, 1]  # Blue background
-                        color: [1, 1, 1, 1]  # White text
-                        font_size: '16sp'
-                        bold: True
                         on_release: app.file_manager_open()
                     
                     # Generate Recommendations Button
-                    Button:
+                    MDRaisedButton:
                         id: recommend_btn
                         text: 'Get Recommendations'
                         on_release: app.generate_playlist()
-                        size_hint: 0.8, None
+                        size_hint: (0.8, None)
                         height: '48dp'
                         pos_hint: {'center_x': 0.5}
-                        background_color: 0, 0, 0, 0  # Transparent background
-                        color: 1, 1, 1, 1  # White text
-                        font_size: '16sp'
-                        bold: True
-                        canvas.before:
-                            Color:
-                                rgba: 0.13, 0.59, 0.95, 1  # Blue background
-                            RoundedRectangle:
-                                size: self.size
-                                pos: self.pos
-                                radius: [24,]
-                            Color:
-                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
-                            Line:
-                                width: 1.5
-                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
+                        disabled: not app.selected_song
                     
-                    # Recommended Songs Section
+                    # Recommended Songs List
                     MDLabel:
                         text: 'Recommended Songs:'
                         size_hint_y: None
-                        height: '40dp'
-                        font_size: '18sp'
+                        height: self.texture_size[1]
+                        padding: '10dp', 0
                         bold: True
-                        theme_text_color: 'Primary'
                     
-                    # Recommended Songs List
                     ScrollView:
-                        size_hint: (1, 1)
-                        do_scroll_x: False
-                        do_scroll_y: True
-                        
                         MDList:
                             id: recommended_songs_list
-                            size_hint_y: None
-                            height: self.minimum_height
                             spacing: '10dp'
-                            padding: '10dp'
-                            
-                            # This will be populated dynamically
-                            MDLabel:
-                                text: 'Select a song and click "Get Recommendations"'
-                                halign: 'center'
-                                theme_text_color: 'Secondary'
-                                size_hint_y: None
-                                height: '40dp'
             
-            # Mood-based Playlist Generation Screen
-            Screen:
+            # Generate Screen
+            MDScreen:
                 name: 'generate_screen'
-                BoxLayout:
+                
+                MDBoxLayout:
                     orientation: 'vertical'
                     padding: '20dp'
                     spacing: '20dp'
                     
                     MDLabel:
-                        text: 'Generate Playlist by Mood'
+                        text: 'Generate Playlist'
                         halign: 'center'
-                        font_size: '24sp'
+                        font_style: 'H5'
                         theme_text_color: 'Primary'
                         bold: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
                     
                     # Mood Selection
                     MDLabel:
                         text: 'Select Mood:'
+                        halign: 'left'
                         size_hint_y: None
-                        height: '40dp'
-                        font_size: '18sp'
-                        bold: True
-                        theme_text_color: 'Primary'
+                        height: self.texture_size[1]
                     
-                    GridLayout:
-                        id: mood_checkboxes
-                        cols: 2
-                        spacing: '10dp'
-                        padding: '10dp'
+                    # Mood checkboxes
+                    MDBoxLayout:
+                        orientation: 'horizontal'
                         size_hint_y: None
-                        height: '120dp'
+                        height: '48dp'
+                        spacing: '10dp'
                         
-                        # Happy
-                        BoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_x: 0.5
-                            CheckBox:
-                                id: happy_check
-                                size_hint: None, None
-                                size: '30dp', '30dp'
-                                active: True
-                                group: 'mood'
-                            Label:
-                                text: 'Happy'
-                                size_hint_x: 0.8
-                                color: 0, 0, 0, 1
-                                
-                        # Sad
-                        BoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_x: 0.5
-                            CheckBox:
-                                id: sad_check
-                                size_hint: None, None
-                                size: '30dp', '30dp'
-                                group: 'mood'
-                            Label:
-                                text: 'Sad'
-                                size_hint_x: 0.8
-                                color: 0, 0, 0, 1
-                        
-                        # Energetic
-                        BoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_x: 0.5
-                            CheckBox:
-                                id: energetic_check
-                                size_hint: None, None
-                                size: '30dp', '30dp'
-                                group: 'mood'
-                            Label:
-                                text: 'Energetic'
-                                size_hint_x: 0.8
-                                color: 0, 0, 0, 1
-                                
-                        # Calm
-                        BoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_x: 0.5
-                            CheckBox:
-                                id: calm_check
-                                size_hint: None, None
-                                size: '30dp', '30dp'
-                                group: 'mood'
-                            Label:
-                                text: 'Calm'
-                                size_hint_x: 0.8
-                                color: 0, 0, 0, 1
+                        MDCheckbox:
+                            id: mood_happy
+                            group: 'mood'
+                            size_hint: None, None
+                            size: '48dp', '48dp'
+                            
+                        MDLabel:
+                            text: 'Happy'
+                            theme_text_color: 'Primary'
+                            size_hint_x: 0.2
+                            
+                        MDCheckbox:
+                            id: mood_sad
+                            group: 'mood'
+                            size_hint: None, None
+                            size: '48dp', '48dp'
+                            
+                        MDLabel:
+                            text: 'Sad'
+                            theme_text_color: 'Primary'
+                            size_hint_x: 0.2
+                            
+                        MDCheckbox:
+                            id: mood_energetic
+                            group: 'mood'
+                            size_hint: None, None
+                            size: '48dp', '48dp'
+                            
+                        MDLabel:
+                            text: 'Energetic'
+                            theme_text_color: 'Primary'
+                            size_hint_x: 0.2
                     
                     # Song Input
                     MDLabel:
@@ -278,149 +215,198 @@
                         halign: 'left'
                         size_hint_y: None
                         height: self.texture_size[1]
-                        
-                    Button:
+                    
+                    MDRaisedButton:
                         id: add_songs_btn
                         text: 'Select Songs'
                         on_release: app.file_manager_open()
                         size_hint: None, None
                         size: '200dp', '48dp'
                         pos_hint: {'center_x': 0.5}
-                        background_color: 0, 0, 0, 0  # Transparent background
-                        color: 0.13, 0.59, 0.95, 1  # Blue text
-                        font_size: '16sp'
-                        bold: True
-                        canvas.before:
-                            Color:
-                                rgba: 0.95, 0.95, 0.95, 1  # Light gray background
-                            RoundedRectangle:
-                                size: self.size
-                                pos: self.pos
-                                radius: [24,]
-                            Color:
-                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
-                            Line:
-                                width: 1.5
-                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
                     
                     # Generate Button
-                    Button:
+                    MDRaisedButton:
                         id: generate_btn
                         text: 'Generate Playlist'
                         on_release: app.generate_playlist()
-                        size_hint: 0.8, None
+                        size_hint: (0.8, None)
                         height: '48dp'
                         pos_hint: {'center_x': 0.5}
-                        background_color: 0, 0, 0, 0  # Transparent background
-                        color: 1, 1, 1, 1  # White text
-                        font_size: '16sp'
-                        bold: True
-                        canvas.before:
-                            Color:
-                                rgba: 0.13, 0.59, 0.95, 1  # Blue background
-                            RoundedRectangle:
-                                size: self.size
-                                pos: self.pos
-                                radius: [24,]
-                            Color:
-                                rgba: 0.13, 0.59, 0.95, 1  # Blue border
-                            Line:
-                                width: 1.5
-                                rounded_rectangle: (self.x, self.y, self.width, self.height, 24)
-                        
+                    
                     # Generated Playlist Section
                     MDLabel:
                         text: 'Generated Playlist:'
                         halign: 'left'
                         size_hint_y: None
                         height: self.texture_size[1]
-                        
+                        padding: '10dp', 0
+                        bold: True
+                    
                     ScrollView:
                         MDList:
                             id: playlist_items
                             spacing: '10dp'
-
+            
+            # Settings Screen
+            MDScreen:
+                name: 'settings_screen'
+                
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    padding: '20dp'
+                    spacing: '20dp'
+                    
+                    MDLabel:
+                        text: 'Settings'
+                        halign: 'center'
+                        font_style: 'H5'
+                        theme_text_color: 'Primary'
+                        bold: True
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                    
+                    # Theme Toggle
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: '48dp'
+                        spacing: '20dp'
+                        padding: '10dp', 0
+                        
+                        MDLabel:
+                            text: 'Dark Mode:'
+                            theme_text_color: 'Primary'
+                            size_hint_x: 0.4
+                            
+                        MDSwitch:
+                            id: dark_mode_switch
+                            pos_hint: {'center_x': 0.5}
+                            on_active: app.toggle_theme()
+                    
+                    # Audio Quality
+                    MDBoxLayout:
+                        orientation: 'vertical'
+                        size_hint_y: None
+                        height: '80dp'
+                        spacing: '10dp'
+                        
+                        MDLabel:
+                            text: 'Audio Quality:'
+                            theme_text_color: 'Primary'
+                            size_hint_y: None
+                            height: self.texture_size[1]
+                            
+                        MDSlider:
+                            id: audio_quality_slider
+                            min: 0
+                            max: 10
+                            value: 8
+                            hint: False
+                            
+                        MDBoxLayout:
+                            orientation: 'horizontal'
+                            size_hint_y: None
+                            height: '20dp'
+                            
+                            MDLabel:
+                                text: 'Low'
+                                theme_text_color: 'Secondary'
+                                size_hint_x: 0.2
+                                halign: 'left'
+                                
+                            MDLabel:
+                                text: 'High'
+                                theme_text_color: 'Secondary'
+                                size_hint_x: 0.2
+                                halign: 'right'
+                    
+                    # Storage Location
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: '60dp'
+                        spacing: '10dp'
+                        
+                        MDLabel:
+                            text: 'Storage Location:'
+                            theme_text_color: 'Primary'
+                            size_hint_x: 0.4
+                            
+                        MDLabel:
+                            id: storage_location
+                            text: '~/Music/Playlists'
+                            theme_text_color: 'Secondary'
+                            size_hint_x: 0.6
+                            halign: 'right'
+                            valign: 'center'
+                    
+                    # Save Button
+                    MDRaisedButton:
+                        text: 'Save Settings'
+                        size_hint: (0.6, None)
+                        height: '48dp'
+                        pos_hint: {'center_x': 0.5}
+                        on_release: app.save_settings()
+        
         # Custom Navigation Bar
-        BoxLayout:
+        MDBoxLayout:
             size_hint_y: None
             height: '56dp'
             padding: '5dp'
             spacing: '5dp'
-            canvas.before:
-                Color:
-                    rgba: 0.13, 0.59, 0.95, 1
-                Rectangle:
-                    size: self.size
-                    pos: self.pos
+            md_bg_color: app.theme_cls.primary_color
             
             # Playlists Button
-            Button:
+            MDRaisedButton:
                 id: playlists_btn
                 text: 'Playlists'
-                on_release: root.switch_screen('playlists_screen')
+                on_release: app.switch_screen('playlists_screen')
                 size_hint_x: 1
-                background_color: 0.13, 0.59, 0.95, 1
-                color: 1, 1, 1, 1
-                font_size: '14sp'
-                bold: True
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        size: self.size
-                        pos: self.pos
-                        radius: [5,]
-            
+                md_bg_color: app.theme_cls.primary_color
+                text_color: 1, 1, 1, 1
+                elevation_normal: 0
+                theme_text_color: 'Custom'
+                
             # Library Button
-            Button:
+            MDRaisedButton:
                 id: library_btn
                 text: 'Library'
-                on_release: root.switch_screen('library_screen')
+                on_release: app.switch_screen('library_screen')
                 size_hint_x: 1
-                background_color: 0.13, 0.59, 0.95, 1
-                color: 1, 1, 1, 1
-                font_size: '14sp'
-                bold: True
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        size: self.size
-                        pos: self.pos
-                        radius: [5,]
-            
+                md_bg_color: app.theme_cls.primary_color
+                text_color: 1, 1, 1, 1
+                elevation_normal: 0
+                theme_text_color: 'Custom'
+                
             # Recommend Button
-            Button:
-                id: recommend_btn_nav
+            MDRaisedButton:
+                id: recommend_btn
                 text: 'Recommend'
-                on_release: root.switch_screen('recommend_screen')
+                on_release: app.switch_screen('recommend_screen')
                 size_hint_x: 1
-                background_color: 0.13, 0.59, 0.95, 1
-                color: 1, 1, 1, 1
-                font_size: '14sp'
-                bold: True
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        size: self.size
-                        pos: self.pos
-                        radius: [5,]
-            
+                md_bg_color: app.theme_cls.primary_color
+                text_color: 1, 1, 1, 1
+                elevation_normal: 0
+                theme_text_color: 'Custom'
+                
             # Generate Button
-            Button:
-                id: generate_btn_nav
+            MDRaisedButton:
+                id: generate_btn
                 text: 'Generate'
-                on_release: root.switch_screen('generate_screen')
+                on_release: app.switch_screen('generate_screen')
                 size_hint_x: 1
-                background_color: 0.07, 0.45, 0.85, 1  # Slightly darker blue
-                color: 1, 1, 1, 1
-                font_size: '14sp'
-                bold: True
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        size: self.size
-                        pos: self.pos
-                        radius: [5,]
+                md_bg_color: app.theme_cls.primary_color
+                text_color: 1, 1, 1, 1
+                elevation_normal: 0
+                theme_text_color: 'Custom'
+                
+            # Settings Button
+            MDRaisedButton:
+                id: settings_btn
+                text: 'Settings'
+                on_release: app.switch_screen('settings_screen')
+                size_hint_x: 1
+                md_bg_color: app.theme_cls.primary_color
+                text_color: 1, 1, 1, 1
+                elevation_normal: 0
+                theme_text_color: 'Custom'

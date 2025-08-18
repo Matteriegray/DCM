@@ -6,11 +6,7 @@ from pathlib import Path
 from functools import partial
 
 # Kivy imports
-from kivy.app import App
 from kivy.core.window import Window
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.popup import Popup
 from kivy.lang import Builder
 from kivy.metrics import dp
 from kivy.properties import (
@@ -18,15 +14,34 @@ from kivy.properties import (
     NumericProperty, BooleanProperty, DictProperty
 )
 from kivy.clock import Clock
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
-from kivy.uix.screenmanager import ScreenManager, Screen, NoTransition
-from kivy.uix.filechooser import FileChooserListView
+from kivy.uix.boxlayout import BoxLayout
 
 # KivyMD imports
 from kivymd.app import MDApp
-from kivymd.uix.list import MDList, MDListItem, MDListItemHeadlineText, MDListItemLeadingIcon
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.floatlayout import MDFloatLayout
+from kivymd.uix.screen import MDScreen
+from kivymd.uix.screenmanager import MDScreenManager
+from kivymd.uix.button import MDRaisedButton, MDFloatingActionButton, MDIconButton, MDFlatButton
+from kivymd.uix.label import MDLabel
+
+
+class MainScreen(MDScreen):
+    """Main application screen that contains the screen manager and navigation."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.name = 'main_screen'
+from kivymd.uix.list import (
+    MDList, OneLineIconListItem, TwoLineListItem, 
+    ThreeLineListItem, IconLeftWidget, ImageLeftWidget
+)
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.progressbar import MDProgressBar
+from kivy.uix.filechooser import FileChooserIconView, FileChooserListLayout, FileChooserController, FileChooserLayout, FileChooserListView
+from kivy.uix.button import Button
+from kivy.uix.popup import Popup
+from kivymd.uix.selectioncontrol import MDCheckbox
+from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.label import MDLabel
 from kivymd.uix.filemanager import MDFileManager
 
@@ -40,12 +55,14 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 if project_root not in sys.path:
     sys.path.append(project_root) 
 
-class FileChoosePopup(BoxLayout):
-    # Popup for the file selection 
+class FileChoosePopup(MDBoxLayout):
+    """Popup for file selection using KivyMD components."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.orientation = 'vertical' 
-        self.size_hint = (0.9, 0.9) 
+        self.orientation = 'vertical'
+        self.size_hint = (0.9, 0.9)
+        self.spacing = '12dp'
+        self.padding = '12dp'
         
 class DCMApp(MDApp):
     selected_files = ListProperty([]) 
@@ -61,14 +78,30 @@ class DCMApp(MDApp):
     volume = NumericProperty(0.8)  # Default volume (0.0 to 1.0)
     
     def __init__(self, **kwargs):
+        # Initialize the app first
         super(DCMApp, self).__init__(**kwargs)
-        self.theme_cls.primary_palette = "Blue"
+        
+        # Theme configuration for KivyMD 1.1.1
+        # Set theme style - 'Light' or 'Dark'
         self.theme_cls.theme_style = "Light"
-        self.theme_cls.primaryColor = [0.13, 0.59, 0.95, 1]  # RGB for #2196F3 (Blue 500)
-        # Force text color to be visible on buttons
-        self.theme_cls.text_color = [0, 0, 0, 1]  # Black text
-        self.theme_cls.primary_text_color = [0, 0, 0, 1]  # Black primary text
-        self.theme_cls.accent_text_color = [1, 1, 1, 1]  # White accent text
+        
+        # Set primary color palette - choose from:
+        # 'Red', 'Pink', 'Purple', 'DeepPurple', 'Indigo', 'Blue', 'LightBlue',
+        # 'Cyan', 'Teal', 'Green', 'LightGreen', 'Lime', 'Yellow', 'Amber',
+        # 'Orange', 'DeepOrange', 'Brown', 'Gray', 'BlueGray'
+        self.theme_cls.primary_palette = "Blue"
+        
+        # Set primary color hue - '50' to '900' or 'A100', 'A200', 'A400', 'A700'
+        self.theme_cls.primary_hue = "500"  # Standard blue
+        
+        # Set accent color palette (for buttons, sliders, etc.)
+        self.theme_cls.accent_palette = "Blue"
+        
+        # Set accent color hue
+        self.theme_cls.accent_hue = "A200"  # Brighter blue for accents
+        
+        # Disable theme switching animation to prevent potential issues
+        self.theme_cls.theme_style_switch_animation = False
         
         # Initialize player state
         self.selected_song = None
@@ -81,36 +114,28 @@ class DCMApp(MDApp):
             duration=self.update_duration,
             is_playing=self.update_play_button_state
         )
+        # Set up song end callback
+        music_player.on_song_end_callback = self.on_song_ended
         
         # Set initial volume
         music_player.volume = self.volume
 
     def build(self):
-        # Set window size for desktop
-        if platform not in ('android', 'ios'):
-            Window.size = (450, 800)  # Slightly larger window
-            Window.minimum_width, Window.minimum_height = 400, 700
+        """Build the application"""
+        # Set window background color
+        from kivy.utils import get_color_from_hex
+        Window.clearcolor = get_color_from_hex('#f5f5f5')  # Light gray background
         
         # Load the KV file
+        from kivy.lang import Builder
         kv_path = os.path.join(os.path.dirname(__file__), 'main.kv')
         if os.path.exists(kv_path):
             Builder.load_file(kv_path)
         else:
             print(f"Error: KV file not found at {kv_path}")
-        
-        # Set window background color
-        from kivy.utils import get_color_from_hex
-        Window.clearcolor = get_color_from_hex('#f5f5f5')  # Light gray background
-        
+            
         # Create and return the main screen
-        # The MainScreen is defined in the KV file and will be automatically instantiated
-        return Builder.load_string('''
-#:import MainScreen dcm.ui.main_screen.MainScreen
-
-MainScreen:
-    id: main_screen
-    name: 'main_screen'
-''')
+        return MainScreen()
 
     def exit_manager(self, *args):
         """Called when the file manager is closed"""
@@ -127,14 +152,65 @@ MainScreen:
             self.show_snackbar(f"Selected {len(self.selected_files)} files")
 
     def switch_screen(self, screen_name):
-        """Switch between different screens"""
-        if hasattr(self, 'root') and hasattr(self.root, 'ids'):
-            if 'screen_manager' in self.root.ids:
-                self.root.ids.screen_manager.current = screen_name
-                # Update navigation button states
-                self.update_nav_buttons(screen_name)
-                return True
-        return False
+        """
+        Switch between different screens and update the active button state
+        
+        Args:
+            screen_name (str): Name of the screen to switch to
+            
+        Returns:
+            bool: True if screen switch was successful, False otherwise
+        """
+        try:
+            print(f"Attempting to switch to screen: {screen_name}")
+            
+            # Get the screen manager and switch to the requested screen
+            if hasattr(self, 'root') and hasattr(self.root, 'ids'):
+                screen_manager = self.root.ids.get('screen_manager')
+                if screen_manager:
+                    print(f"Found screen manager. Current screen: {screen_manager.current}")
+                    
+                    # Check if the screen exists, if not create a basic one
+                    if not screen_manager.has_screen(screen_name):
+                        print(f"Screen '{screen_name}' not found, creating a new one")
+                        from kivymd.uix.screen import MDScreen
+                        screen = MDScreen(name=screen_name)
+                        screen_manager.add_widget(screen)
+                    
+                    # Set the current screen
+                    screen_manager.current = screen_name
+                    print(f"Switched to screen: {screen_name}")
+                    
+                    # Update navigation button states
+                    self.update_nav_buttons(screen_name)
+                    
+                    # Additional screen-specific logic
+                    try:
+                        if screen_name == 'playlists_screen' and hasattr(self, 'refresh_playlists'):
+                            self.refresh_playlists()
+                        elif screen_name == 'library_screen' and hasattr(self, 'load_library'):
+                            self.load_library()
+                        elif screen_name == 'recommend_screen' and hasattr(self, 'prepare_recommendations'):
+                            self.prepare_recommendations()
+                        elif screen_name == 'generate_screen' and hasattr(self, 'prepare_generation'):
+                            self.prepare_generation()
+                        elif screen_name == 'settings_screen' and hasattr(self, 'load_settings'):
+                            self.load_settings()
+                    except Exception as e:
+                        print(f"Error in screen-specific logic for '{screen_name}': {str(e)}")
+                    
+                    return True
+                else:
+                    print("Screen manager not found in root.ids")
+            else:
+                print("Root widget or ids not available")
+                
+            return False
+        except Exception as e:
+            print(f"Error switching to screen '{screen_name}': {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
         
     def on_start(self):
         """Called when the application is starting up"""
@@ -146,24 +222,20 @@ MainScreen:
                 # Access the screen manager through the root widget
                 if hasattr(self, 'root') and hasattr(self.root, 'ids'):
                     if 'screen_manager' in self.root.ids:
-                        self.root.ids.screen_manager.current = 'recommend_screen'
+                        screen_manager = self.root.ids.screen_manager
+                        if not screen_manager.has_screen('recommend_screen'):
+                            # If recommend_screen doesn't exist, create and add it
+                            from kivymd.uix.screen import MDScreen
+                            screen = MDScreen(name='recommend_screen')
+                            screen_manager.add_widget(screen)
+                        
+                        screen_manager.current = 'recommend_screen'
                         # Update navigation button states
                         self.update_nav_buttons('recommend_screen')
                         return
-                    
-                    # Try to find the screen manager by walking the widget tree
-                    for widget in self.root.walk():
-                        if hasattr(widget, 'id') and widget.id == 'screen_manager':
-                            widget.current = 'recommend_screen'
-                            self.update_nav_buttons('recommend_screen')
-                            return
                 
                 print("Warning: Could not find or access screen manager")
                 
-                # As a fallback, try to switch screens using the MainScreen method
-                if hasattr(self.root, 'switch_screen'):
-                    self.root.switch_screen('recommend_screen')
-                    
             except Exception as e:
                 print(f"Error in set_initial_screen: {str(e)}")
         
@@ -171,107 +243,342 @@ MainScreen:
         Clock.schedule_once(set_initial_screen, 0.5)  # Slightly longer delay to ensure UI is ready
         
     def update_nav_buttons(self, active_screen):
-        """Update the navigation buttons to show which screen is active"""
-        if not hasattr(self, 'root') or not hasattr(self.root, 'ids'):
-            return
+        """
+        Update the navigation buttons to show which screen is active
+        
+        Args:
+            active_screen (str): Name of the currently active screen
+        """
+        try:
+            print(f"Updating navigation buttons for screen: {active_screen}")
+            if not hasattr(self, 'root') or not hasattr(self.root, 'ids'):
+                print("Cannot update buttons: root or ids not available")
+                return
+                
+            # List of all navigation buttons
+            nav_buttons = {
+                'playlists_btn': 'playlists_screen',
+                'library_btn': 'library_screen',
+                'recommend_btn': 'recommend_screen',
+                'generate_btn': 'generate_screen'
+            }
             
-        # Default button colors
-        active_color = [0.07, 0.45, 0.85, 1]  # Darker blue for active
-        inactive_color = [0.13, 0.59, 0.95, 1]  # Lighter blue for inactive
-        
-        # Update button colors based on active screen
-        if 'recommend_btn_nav' in self.root.ids:
-            self.root.ids.recommend_btn_nav.background_color = active_color if active_screen == 'recommend_screen' else inactive_color
-        if 'generate_btn_nav' in self.root.ids:
-            self.root.ids.generate_btn_nav.background_color = active_color if active_screen == 'generate_screen' else inactive_color
-        
+            # Debug: Print available IDs
+            print(f"Available IDs in root: {list(self.root.ids.keys())}")
+            
+            # Update button states
+            for btn_id, screen_name in nav_buttons.items():
+                if btn_id in self.root.ids:
+                    btn = self.root.ids[btn_id]
+                    if screen_name == active_screen:
+                        # Active button
+                        print(f"Setting {btn_id} as active")
+                        btn.md_bg_color = self.theme_cls.primary_light
+                        btn.text_color = (1, 1, 1, 1)
+                    else:
+                        # Inactive button
+                        print(f"Setting {btn_id} as inactive")
+                        btn.md_bg_color = self.theme_cls.primary_color
+                        btn.text_color = (1, 1, 1, 0.8)
+                else:
+                    print(f"Button {btn_id} not found in root.ids")
+                        
+        except Exception as e:
+            print(f"Error updating navigation buttons: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
     def generate_playlist(self):
-        """Handle the generate playlist button click"""
+        """Handle the generate playlist button click
+        
+        This method handles both song-based recommendations and genre/mood-based
+        playlist generation using the PlaylistGenerator class, with enhanced
+        error handling and user feedback.
+        """
+        from dcm.ui import LoadingDialog
+        from kivy.clock import Clock
+        import os
+        from datetime import datetime
+        
         print("Generate playlist button clicked")
         
-        # Check if we're in song-based or genre-based mode
-        if hasattr(self, 'root') and 'screen_manager' in self.root.ids:
-            current_screen = self.root.ids.screen_manager.current
-            
-            if current_screen == 'recommend_screen':
-                # Song-based recommendations (Spotify-like)
-                if not self.selected_song:
-                    self.show_error_dialog("No Song Selected", "Please select a song to get recommendations.")
+        def update_loading(message: str = None, progress: float = None, max_steps: float = None):
+            """Helper to update the loading dialog"""
+            if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                if message is not None:
+                    self.loading_dialog.status_text = message
+                if progress is not None:
+                    self.loading_dialog.progress = progress
+                if max_steps is not None:
+                    self.loading_dialog.max_progress = max_steps
+        
+        def show_error(title: str, message: str, dismiss_loading: bool = True):
+            """Helper to show an error dialog and log the error"""
+            print(f"Error: {title} - {message}")
+            if dismiss_loading and hasattr(self, 'loading_dialog') and self.loading_dialog:
+                self.loading_dialog.dismiss()
+            self.show_error_dialog(title, message)
+        
+        def cancel_operation():
+            """Handle cancellation of the current operation"""
+            self.operation_cancelled = True
+            if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                self.loading_dialog.dismiss()
+            self.show_snackbar("Operation cancelled")
+        
+        # Show loading dialog with progress bar
+        self.loading_dialog = LoadingDialog(
+            title="Generating Playlist",
+            status_text="Initializing...",
+            progress=0,
+            max_progress=10,  # Will be updated based on operation
+            cancel_button_text="CANCEL"
+        )
+        self.loading_dialog.set_cancel_callback(cancel_operation)
+        self.loading_dialog.open()
+        
+        # Track operation state
+        self.current_operation = "playlist_generation"
+        self.operation_cancelled = False
+        
+        # Use Clock to run the generation asynchronously
+        def generate_async(dt):
+            try:
+                # Check if operation was cancelled
+                if self.operation_cancelled:
+                    return
+                    
+                # Check if UI is properly initialized
+                if not hasattr(self, 'root') or 'screen_manager' not in self.root.ids:
+                    show_error("UI Error", "Application UI is not properly initialized.")
                     return
                 
-                # Clear previous recommendations
-                if 'recommended_songs_list' in self.root.ids:
-                    self.root.ids.recommended_songs_list.clear_widgets()
+                current_screen = self.root.ids.screen_manager.current
                 
-                # Add the selected song to the database if it's not already there
-                song_id = db.add_song(
-                    file_path=self.selected_song,
-                    title=os.path.splitext(os.path.basename(self.selected_song))[0],
-                    # In a real app, you would extract metadata from the audio file here
-                    genre="Unknown",
-                    mood="Unknown"
-                )
+                if current_screen == 'recommend_screen':
+                    # Song-based recommendations (Spotify-like)
+                    update_loading("Analyzing selected song...", 1, 5)
+                    
+                    if not self.selected_song:
+                        show_error("No Song Selected", "Please select a song to get recommendations.")
+                        return
+                    
+                    # Initialize PlaylistGenerator with features file
+                    features_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'song_features.csv')
+                    if not os.path.exists(features_file):
+                        show_error("Missing Data", "Could not find song features database. Please ensure the application is properly installed.")
+                        return
+                    
+                    try:
+                        update_loading("Loading song database...", 2)
+                        generator = PlaylistGenerator(features_file)
+                        
+                        update_loading("Finding similar songs...", 3)
+                        recommended_songs = generator.find_similar_songs(
+                            song_path=self.selected_song,
+                            n=5,
+                            mood_filter=self.get_selected_mood()
+                        )
+                        
+                        if recommended_songs:
+                            # Convert file paths to song dictionaries
+                            self.recommended_songs = []
+                            for i, song in enumerate(recommended_songs, 1):
+                                if self.operation_cancelled:
+                                    return
+                                try:
+                                    self.recommended_songs.append({
+                                        'title': os.path.splitext(os.path.basename(song))[0],
+                                        'file_path': song,
+                                        'artist': "Unknown Artist",
+                                        'album': "Unknown Album"
+                                    })
+                                    update_loading(f"Processing recommendation {i}/{len(recommended_songs)}...", 3 + (i/len(recommended_songs)))
+                                except Exception as e:
+                                    print(f"Warning: Could not process song {song}: {str(e)}")
+                            
+                            if self.recommended_songs:
+                                update_loading("Updating recommendations...", 4)
+                                self.update_recommendations_ui()
+                                self.switch_screen('recommend_screen')
+                                self.show_snackbar(f"Found {len(self.recommended_songs)} similar songs")
+                            else:
+                                show_error("No Valid Songs", "Could not process any of the recommended songs.")
+                        else:
+                            update_loading("No similar songs found, generating alternatives...", 3)
+                            self.simulate_recommendations()
+                            
+                    except Exception as e:
+                        error_msg = f"Error generating recommendations: {str(e)}"
+                        print(error_msg)
+                        show_error("Generation Error", "Failed to generate song recommendations. Please try again.")
+                    
+                elif current_screen == 'generate_screen':
+                    # Genre/mood-based playlist generation
+                    update_loading("Preparing playlist generation...", 1, 6)
+                    mood = self.get_selected_mood()
+                    
+                    # Validate selected files
+                    if not self.selected_files:
+                        show_error("No Files Selected", "Please select at least one music file.")
+                        return
+                    
+                    # Check if files exist
+                    missing_files = [f for f in self.selected_files if not os.path.exists(f)]
+                    if missing_files:
+                        show_error("Missing Files", f"Could not find the following files:\n{', '.join(missing_files[:3])}{'...' if len(missing_files) > 3 else ''}")
+                        return
+                    
+                    # Initialize PlaylistGenerator with features file
+                    features_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'song_features.csv')
+                    if not os.path.exists(features_file):
+                        show_error("Missing Data", "Could not find song features database. Please ensure the application is properly installed.")
+                        return
+                    
+                    try:
+                        update_loading("Loading song database...", 2)
+                        generator = PlaylistGenerator(features_file)
+                        
+                        # Create output directory if it doesn't exist
+                        output_dir = os.path.join(os.path.expanduser('~'), 'Music', 'DCM_Playlists')
+                        os.makedirs(output_dir, exist_ok=True)
+                        
+                        # Generate a unique filename based on timestamp
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        output_file = os.path.join(output_dir, f"playlist_{timestamp}.m3u")
+                        
+                        playlist_name = f"{mood.capitalize()} Mix - {datetime.now().strftime('%b %d, %Y')}" if mood else f"My Playlist - {datetime.now().strftime('%b %d, %Y')}"
+                        
+                        update_loading("Analyzing songs...", 3)
+                        
+                        # Generate playlist with progress updates
+                        def progress_callback(progress, status):
+                            if self.operation_cancelled:
+                                return False
+                            update_loading(status, 3 + (progress * 2))  # Scale progress to 3-5 range
+                            return True
+                        
+                        update_loading("Generating playlist...", 3)
+                        success = generator.generate_playlist(
+                            song_paths=self.selected_files,
+                            output_file=output_file,
+                            playlist_name=playlist_name,
+                            mood=mood,
+                            max_songs=20,
+                            shuffle=True,
+                            progress_callback=progress_callback
+                        )
+                        
+                        if not success or not os.path.exists(output_file):
+                            raise Exception("Failed to generate playlist file")
+                            
+                        try:
+                            # Load the generated playlist
+                            with open(output_file, 'r', encoding='utf-8') as f:
+                                playlist_songs = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                            
+                            if not playlist_songs:
+                                raise ValueError("Generated playlist is empty")
+                            
+                            # Update UI with the generated playlist
+                            update_loading("Finalizing playlist...", 5)
+                            self.recommended_songs = []
+                            
+                            for i, song in enumerate(playlist_songs, 1):
+                                if self.operation_cancelled:
+                                    return
+                                try:
+                                    self.recommended_songs.append({
+                                        'title': os.path.splitext(os.path.basename(song))[0],
+                                        'file_path': song,
+                                        'artist': "Unknown Artist",
+                                        'album': "Unknown Album"
+                                    })
+                                    # Update progress based on processing songs
+                                    update_loading(
+                                        f"Processing {i}/{len(playlist_songs)} songs...",
+                                        5 + (i / len(playlist_songs))
+                                    )
+                                except Exception as e:
+                                    print(f"Warning: Could not process song {song}: {str(e)}")
+                            
+                            if self.recommended_songs:
+                                self.update_recommendations_ui()
+                                self.switch_screen('recommend_screen')
+                                self.show_snackbar(f"Playlist generated with {len(self.recommended_songs)} songs")
+                            else:
+                                raise ValueError("No valid songs found in the generated playlist")
+                                
+                        except Exception as e:
+                            error_msg = f"Error processing generated playlist: {str(e)}"
+                            print(error_msg)
+                            show_error("Playlist Error", "The playlist was generated but could not be loaded. Please try again.")
+                            
+                    except Exception as e:
+                        error_msg = f"Error generating playlist: {str(e)}"
+                        print(error_msg)
+                        show_error("Generation Error", "Failed to generate playlist. Please try again with different settings.")
                 
-                # Get similar songs from the database
-                similar_songs = db.get_similar_songs(song_id, limit=5)
-                
-                if similar_songs:
-                    # Display the recommendations
-                    self.display_recommendations(similar_songs)
                 else:
-                    # Fallback to simulated recommendations if no similar songs found
-                    self.simulate_recommendations()
+                    show_error("Invalid Screen", "Cannot generate playlist from the current screen.")
                 
-            elif current_screen == 'generate_screen':
-                # Genre/mood-based playlist generation
-                mood = self.get_selected_mood()
+            except Exception as e:
+                if not self.operation_cancelled:  # Don't show error if operation was cancelled
+                    error_msg = f"Unexpected error: {str(e)}"
+                    print(error_msg)
+                    show_error("Unexpected Error", "An unexpected error occurred. Please restart the application and try again.")
                 
-                # Check if we have selected files
-                if not self.selected_files:
-                    self.show_error_dialog("No Files Selected", "Please select at least one music file.")
-                    return
-                
-                # Clear previous playlist items
-                if 'playlist_items' in self.root.ids:
-                    self.root.ids.playlist_items.clear_widgets()
-                
-                # Add files to database and create a playlist
-                song_ids = []
-                for file_path in self.selected_files:
-                    song_id = db.add_song(
-                        file_path=file_path,
-                        title=os.path.splitext(os.path.basename(file_path))[0],
-                        mood=mood
-                    )
-                    song_ids.append(song_id)
-                
-                # Create a playlist with these songs
-                playlist_name = f"{mood.capitalize()} Mix - {len(song_ids)} songs"
-                playlist_id = db.add_playlist(playlist_name, song_ids)
-                
-                # Get the playlist songs with full metadata
-                playlist_songs = db.get_playlist_songs(playlist_id)
-                
-                # Display the playlist
-                self.display_playlist(playlist_songs)
-                
-                # Update the current playlist for playback
-                self.current_playlist = [song['file_path'] for song in playlist_songs]
-                
-                # Auto-play the first song if there are any
-                if self.current_playlist:
-                    self.play_song(0)
+            finally:
+                # Close loading dialog if not already closed
+                if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                    self.loading_dialog.dismiss()
+        
+        # Schedule the async generation with a small delay to allow UI to update
+        Clock.schedule_once(generate_async, 0.1)
         
     def on_playlist_generated(self):
-        """Callback when playlist generation is complete"""
-        self.show_snackbar("Playlist generated successfully!")
-        # Here you would update the UI with the generated playlist
-        # For now, we'll just print a message
-        print("Playlist generated successfully!")
+        """Callback when playlist generation is complete
+        
+        This method is called after a playlist has been successfully generated.
+        It updates the UI to show the generated playlist and prepares it for playback.
+        """
+        try:
+            if hasattr(self, 'recommended_songs') and self.recommended_songs:
+                # Update the current playlist for playback
+                self.current_playlist = [song.get('file_path', '') for song in self.recommended_songs]
+                self.current_index = 0
+                
+                # Update the UI to show the new playlist
+                self.update_recommendations_ui()
+                
+                # Show success message
+                self.show_snackbar(f"Generated playlist with {len(self.recommended_songs)} songs")
+                
+                # Auto-play the first song if there are any
+                if self.current_playlist and self.current_playlist[0]:
+                    self.play_song(0)
+            else:
+                self.show_error_dialog("Error", "No songs were added to the playlist.")
+                
+        except Exception as e:
+            error_msg = f"Error finalizing playlist: {str(e)}"
+            print(error_msg)
+            self.show_error_dialog("Error", "Failed to finalize the playlist.")
 
     def file_manager_open(self):
         # Create a popup for file selection
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        
+        # Add instruction label
+        instruction = MDLabel(
+            text="Select a music file to add to your library",
+            size_hint_y=None,
+            height='40dp',
+            theme_text_color='Primary',
+            halign='center',
+            valign='middle'
+        )
+        content.add_widget(instruction)
         
         # Set a default directory that should exist
         default_dir = os.path.expanduser('~')
@@ -283,29 +590,28 @@ MainScreen:
         # Create file chooser
         file_chooser = FileChooserListView(
             path=start_path,
-            filters=['*.mp3', '*.wav', '*.m4a', '*.flac'],
-            multiselect=False
+            filters=['*.mp3', '*.wav', '*.ogg', '*.m4a', '*.flac'],
+            size_hint=(1, 1)
         )
+        content.add_widget(file_chooser)
+        
+        # Create buttons container
+        btn_box = BoxLayout(size_hint_y=None, height='50dp', spacing=10)
         
         # Create buttons
-        btn_box = BoxLayout(size_hint_y=None, height=50, spacing=10)
-        
-        btn_select = Button(
-            text='Select',
-            background_color=(0.13, 0.59, 0.95, 1),
-            color=(1, 1, 1, 1),
-            bold=True
+        btn_select = MDRaisedButton(
+            text='SELECT',
+            size_hint=(0.5, 1),
+            md_bg_color=self.theme_cls.primary_color
         )
         
-        btn_cancel = Button(
-            text='Cancel',
-            background_color=(0.8, 0.2, 0.2, 1),
-            color=(1, 1, 1, 1),
-            bold=True
+        btn_cancel = MDFlatButton(
+            text='CANCEL',
+            size_hint=(0.5, 1),
+            theme_text_color='Custom',
+            text_color=self.theme_cls.primary_color
         )
         
-        # Add widgets to layout
-        content.add_widget(file_chooser)
         btn_box.add_widget(btn_select)
         btn_box.add_widget(btn_cancel)
         content.add_widget(btn_box)
@@ -317,26 +623,15 @@ MainScreen:
             size_hint=(0.9, 0.9)
         )
         
-        # Button actions
-        def select_files(instance):
+        def select_file(instance):
             if file_chooser.selection:
                 self.selected_song = file_chooser.selection[0]
                 song_name = os.path.basename(self.selected_song)
-                
-                # Update the selected song label
-                if hasattr(self, 'root') and hasattr(self.root, 'ids'):
-                    if 'selected_song_label' in self.root.ids:
-                        self.root.ids.selected_song_label.text = song_name
-                
-                # In a real app, you would call your recommendation engine here
-                # For now, we'll simulate some recommendations
-                self.simulate_recommendations()
-                
                 self.show_snackbar(f"Selected: {song_name}")
             popup.dismiss()
-            
-        btn_select.bind(on_release=select_files)
-        btn_cancel.bind(on_release=lambda x: popup.dismiss())
+        
+        btn_select.bind(on_release=select_file)
+        btn_cancel.bind(on_release=popup.dismiss)
         
         # Open the popup
         popup.open()
@@ -347,100 +642,115 @@ MainScreen:
         Handles both string (file path) and dictionary (song object) types for self.selected_song.
         Generates diverse recommendations instead of variations of the same song.
         """
-        if not hasattr(self, 'selected_song') or not self.selected_song:
-            self.show_error_dialog("Error", "No song selected for recommendations.")
-            return
-            
         try:
-            # Sample data for generating diverse recommendations
-            sample_artists = ["A.R. Rahman", "Taylor Swift", "The Weeknd", "BTS", "Adele", "Ed Sheeran", "Billie Eilish"]
-            sample_albums = ["Midnight Memories", "After Hours", "30", "BE", "Folklore", "Happier Than Ever", "="]
-            sample_genres = ["Pop", "Rock", "Hip Hop", "Electronic", "R&B", "Classical", "Jazz"]
+            # Show loading dialog
+            loading_dialog = self.show_loading_dialog("Analyzing your song and finding similar tracks...")
             
-            # Get some information about the selected song for context
-            if isinstance(self.selected_song, dict):
-                # If it's a song object, use its genre if available
-                song_title = self.selected_song.get('title', 'Unknown Song')
-                song_genre = self.selected_song.get('genre', random.choice(sample_genres))
-                
-                # If we have a file path in the song object, use that as the base
-                if 'file_path' in self.selected_song and self.selected_song['file_path']:
-                    base_name = os.path.basename(self.selected_song['file_path'])
-                    name, _ = os.path.splitext(base_name)
-            else:
-                # If it's a string, treat it as a file path
-                base_name = os.path.basename(self.selected_song)
-                name, _ = os.path.splitext(base_name)
-                song_title = name
-                song_genre = random.choice(sample_genres)
+            # Use Clock to simulate async processing
+            def process_recommendations(dt):
+                try:
+                    # Determine the base song name and path
+                    if isinstance(self.selected_song, dict):
+                        # Handle case where selected_song is a dictionary
+                        song_title = self.selected_song.get('title', 'Unknown Song')
+                        song_artist = self.selected_song.get('artist', 'Unknown Artist')
+                        song_album = self.selected_song.get('album', 'Unknown Album')
+                        song_path = self.selected_song.get('file_path', '')
+                    else:
+                        # Handle case where selected_song is a file path string
+                        song_path = self.selected_song
+                        song_title = os.path.splitext(os.path.basename(song_path))[0]
+                        song_artist = "Unknown Artist"
+                        song_album = "Unknown Album"
+                    
+                    # Generate diverse recommendations with different artists and albums
+                    recommended_songs = []
+                    
+                    # Sample data for realistic recommendations
+                    artists = ["The Beatles", "Taylor Swift", "Ed Sheeran", "Adele", "Coldplay", 
+                              "BTS", "Billie Eilish", "Drake", "Ariana Grande", "The Weeknd"]
+                    
+                    albums = ["Midnight Memories", "Red (Taylor's Version)", "÷ (Divide)", "30", 
+                             "Music of the Spheres", "Map of the Soul: 7", "Happier Than Ever",
+                             "Certified Lover Boy", "Positions", "After Hours"]
+                    
+                    genres = ["Pop", "Rock", "Hip Hop", "R&B", "Electronic", "Jazz", "Classical", "Country"]
+                    
+                    moods = ["Happy", "Energetic", "Chill", "Romantic", "Melancholic", "Upbeat", "Relaxed", "Party"]
+                    
+                    # Generate 5 unique recommendations
+                    used_indices = set()
+                    for i in range(5):
+                        # Ensure unique artist/album combinations
+                        while True:
+                            artist_idx = random.randint(0, len(artists) - 1)
+                            album_idx = random.randint(0, len(albums) - 1)
+                            if (artist_idx, album_idx) not in used_indices:
+                                used_indices.add((artist_idx, album_idx))
+                                break
+                        
+                        # Create a realistic song title based on the original song's mood
+                        mood = random.choice(moods)
+                        song_theme = f"{mood} {random.choice(['Nights', 'Days', 'Vibes', 'Memories', 'Moments'])}"
+                        
+                        # Create a recommendation
+                        rec = {
+                            'title': song_theme,
+                            'artist': artists[artist_idx],
+                            'album': albums[album_idx],
+                            'genre': random.choice(genres),
+                            'mood': mood,
+                            'duration': random.randint(180, 300),  # 3-5 minutes
+                            'file_path': f"/path/to/music/{artists[artist_idx].lower().replace(' ', '_')}_{song_theme.lower().replace(' ', '_')}.mp3"
+                        }
+                        recommended_songs.append(rec)
+                    
+                    # Update the UI with recommendations
+                    self.recommended_songs = recommended_songs
+                    
+                    # Close loading dialog
+                    if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                        self.loading_dialog.dismiss()
+                        
+                    # Cancel progress updates
+                    if hasattr(self, 'progress_ev'):
+                        self.progress_ev.cancel()
+                    
+                    # Update UI and switch screens
+                    self.update_recommendations_ui()
+                    self.switch_screen('recommend_screen')
+                    
+                except Exception as e:
+                    # Close loading dialog on error
+                    if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                        self.loading_dialog.dismiss()
+                    
+                    # Cancel progress updates on error
+                    if hasattr(self, 'progress_ev'):
+                        self.progress_ev.cancel()
+                    
+                    error_msg = f"Error in recommendation process: {str(e)}"
+                    print(error_msg)
+                    self.show_error_dialog("Error", "Could not generate recommendations. Please try again.")
             
-            # Generate diverse recommendations (not just variations of the same song)
-            recommended_songs = []
-            for i in range(5):  # Generate 5 diverse recommendations
-                # Select a different artist for each recommendation
-                artist = random.choice(sample_artists)
-                while artist == self.selected_song.get('artist', ''):
-                    artist = random.choice(sample_artists)
-                
-                # Select a different album
-                album = random.choice(sample_albums)
-                
-                # Create a unique song title
-                title = f"{random.choice(['Echoes', 'Midnight', 'Dreams', 'Horizon', 'Starlight'])} " \
-                       f"{random.choice(['of', 'in', 'beyond', 'across'])} " \
-                       f"{random.choice(['Time', 'Space', 'Love', 'Life', 'You'])}"
-                
-                # Ensure we don't recommend the same song
-                if title == song_title:
-                    title = f"{title} (Remix)"
-                
-                # Add to recommendations
-                recommended_songs.append({
-                    'title': title,
-                    'artist': artist,
-                    'album': album,
-                    'genre': song_genre,  # Keep the same genre for relevance
-                    'duration': random.randint(150, 300),  # 2.5 to 5 minutes
-                    'file_path': f"/path/to/music/{artist.replace(' ', '_')}/{album.replace(' ', '_')}/{title.replace(' ', '_')}.mp3"
-                })
+            # Schedule the processing to happen asynchronously
+            Clock.schedule_once(process_recommendations, 0.5)
             
-            # Store the recommended songs
-            self.recommended_songs = recommended_songs
-            
-            # Update the UI with the recommendations
-            self.update_recommendations_ui()
-            
-            # Switch to the recommend screen
-            self.switch_screen('recommend_screen')
+            return True
             
         except Exception as e:
-            error_msg = f"Failed to generate recommendations: {str(e)}"
+            # Close loading dialog if it's open
+            if hasattr(self, 'loading_dialog') and self.loading_dialog:
+                self.loading_dialog.dismiss()
+                
+            # Cancel progress updates if they exist
+            if hasattr(self, 'progress_ev'):
+                self.progress_ev.cancel()
+                
+            error_msg = f"Error generating recommendations: {str(e)}"
             print(error_msg)
-            import traceback
-            traceback.print_exc()
-            # Show a user-friendly error message
-            self.show_error_dialog("Recommendation Error", 
-                                 "We couldn't generate recommendations right now. Please try again later.")
-    
-    def files_selected(self, selection, path):
-        """Handle selected song file"""
-        if selection:
-            # For now, just take the first selected file
-            self.selected_song = selection[0]
-            song_name = os.path.basename(self.selected_song)
-            
-            # Update the selected song label
-            if hasattr(self, 'root') and hasattr(self.root, 'ids'):
-                if 'selected_song_label' in self.root.ids:
-                    self.root.ids.selected_song_label.text = song_name
-            
-            # In a real app, you would call your recommendation engine here
-            # For now, we'll simulate some recommendations
-            self.simulate_recommendations()
-            
-            self.show_snackbar(f"Selected: {song_name}")
-        else:
-            self.show_snackbar("No file selected")
+            self.show_error_dialog("Error", "Could not generate recommendations. Please try again.")
+            return False
 
     def show_snackbar(self, text, duration=2.0):
         """Show a notification popup with the given text"""
@@ -586,133 +896,205 @@ MainScreen:
             recommended_list.add_widget(label)
             return
             
-        # Add each recommended song to the list
-        for song in self.recommended_songs:
-            # Ensure we have a dictionary with the required keys
-            if not isinstance(song, dict):
-                song = {'title': str(song), 'artist': 'Unknown Artist', 'album': 'Unknown Album'}
-            
-            # Create a container for the song info
-            content = BoxLayout(orientation='vertical', padding=["16dp", "8dp", "8dp", "8dp"])
-            
-            # Add song title
-            title_label = MDLabel(
-                text=str(song.get('title', 'Unknown Song')),
-                theme_text_color="Custom",
-                text_color=[0, 0, 0, 1],  # Black text
-                font_size='14sp',
-                size_hint_y=None,
-                height=dp(24)
-            )
-            
-            # Add artist and album info
-            info_label = MDLabel(
-                text=f"{song.get('artist', 'Unknown Artist')} • {song.get('album', 'Unknown Album')}",
-                theme_text_color="Secondary",
-                font_size='12sp',
-                size_hint_y=None,
-                height=dp(20)
-            )
-            
-            content.add_widget(title_label)
-            content.add_widget(info_label)
-            
-            # Create the list item with an icon and the content
-            item = MDListItem(
-                MDListItemLeadingIcon(
-                    icon="music-note",
-                    theme_icon_color="Custom",
-                    icon_color=[0.13, 0.59, 0.95, 1],  # Blue color for the icon
-                    size_hint_x=None,
-                    width=dp(48)
-                ),
-                content,
-                on_release=lambda x, s=song: self.on_song_selected(s),
-                size_hint_y=None,
-                height=dp(72)
-            )
-            recommended_list.add_widget(item)
-    
-    def on_song_selected(self, song):
-        """Handle when a recommended song is selected.
-        
-        Args:
-            song: Dictionary containing song information with at least a 'title' key.
-                  May also contain 'file_path', 'artist', 'album', etc.
-        """
         try:
-            if not song or not isinstance(song, dict):
+            # Add each recommended song to the list
+            for song in self.recommended_songs:
+                # Ensure we have a dictionary with the required keys
+                if not isinstance(song, dict):
+                    song = {'title': str(song), 'artist': 'Unknown Artist', 'album': 'Unknown Album'}
+                
+                # Create a container for the song info
+                content = BoxLayout(orientation='vertical', padding=["16dp", "8dp", "8dp", "8dp"])
+                
+                # Add song title
+                title_label = MDLabel(
+                    text=str(song.get('title', 'Unknown Song')),
+                    theme_text_color="Custom",
+                    text_color=[0, 0, 0, 1],  # Black text
+                    font_size='14sp',
+                    size_hint_y=None,
+                    height=dp(24)
+                )
+                
+                # Add artist and album info
+                info_label = MDLabel(
+                    text=f"{song.get('artist', 'Unknown Artist')} • {song.get('album', 'Unknown Album')}",
+                    theme_text_color="Secondary",
+                    font_size='12sp',
+                    size_hint_y=None,
+                    height=dp(20)
+                )
+                
+                # Create the list item with an icon and the content
+                item = OneLineIconListItem(
+                    text=str(song.get('title', 'Unknown Song')),
+                    theme_text_color="Custom",
+                    text_color=[0, 0, 0, 1],  # Black text
+                    on_release=lambda x, s=song: self.on_song_selected(s)
+                )
+                item.add_widget(IconLeftWidget(
+                    icon="music-note",
+                    theme_text_color="Custom",
+                    text_color=[0.13, 0.59, 0.95, 1]  # Blue color for the icon
+                ))
+                
+                # Add the item to the recommended songs list
+                if hasattr(self, 'recommended_songs_list'):
+                    self.recommended_songs_list.add_widget(item)
+                    
+        except Exception as e:
+            self.show_error_dialog("Error", f"Failed to add song to recommendations: {str(e)}")
+    
+    def on_song_ended(self):
+        """Handle when the current song ends and trigger next song or recommendations."""
+        try:
+            if not hasattr(self, 'current_playlist') or not self.current_playlist:
+                return
+                
+            # If we have more songs in the playlist, play the next one
+            if hasattr(self, 'current_index') and self.current_index < len(self.current_playlist) - 1:
+                next_index = self.current_index + 1
+                self.play_song(index=next_index)
+            # Otherwise, generate new recommendations based on the last played song
+            elif hasattr(self, 'recommended_songs') and self.recommended_songs:
+                self.show_snackbar("Generating new recommendations...")
+                # Get the last played song's features to find similar songs
+                last_song = self.current_playlist[-1] if self.current_playlist else None
+                if last_song:
+                    self.on_song_selected(last_song)
+        except Exception as e:
+            print(f"Error in on_song_ended: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def on_song_selected(self, song):
+        """Handle when a recommended song is selected."""
+        try:
+            if not song or not isinstance(song, (dict, str)):
                 self.show_error_dialog("Error", "Invalid song data")
                 return
                 
-            song_title = song.get('title', 'Unknown Song')
+            # Handle both string paths and song dictionaries
+            if isinstance(song, dict):
+                song_title = song.get('title', 'Unknown Song')
+                song_artist = song.get('artist', 'Unknown Artist')
+                file_path = song.get('file_path', song.get('path', ''))
+            else:  # It's a string path
+                song_title = os.path.basename(song)
+                song_artist = "Unknown Artist"
+                file_path = song
+                
             self.show_snackbar(f"Selected: {song_title}")
             
-            # Play the selected song
-            if not self.play_song(song_data=song):
-                self.show_error_dialog("Playback Error", f"Could not play: {song_title}")
+            # Check if we have a valid file path
+            if not file_path or not os.path.exists(file_path):
+                self.show_error_dialog("File Not Found", f"Could not find audio file: {file_path}")
                 return
-            
-            # Update the selected song and get new recommendations
+                
+            # Update the selected song and UI
             self.selected_song = song
+            self.current_song = song_title
+            self.current_artist = song_artist
+            self.current_album = song.get('album', 'Unknown Album') if isinstance(song, dict) else 'Unknown Album'
             
             # Update the selected song label in the UI
             if hasattr(self, 'root') and hasattr(self.root, 'ids'):
                 if 'selected_song_label' in self.root.ids:
                     self.root.ids.selected_song_label.text = song_title
             
+            # Play the selected song
+            if not music_player.play(file_path):
+                self.show_error_dialog("Playback Error", f"Could not play: {song_title}")
+                return
+                
+            # Update playback state
+            self.is_playing = True
+            self.total_time = music_player.duration
+            
+            # Update the current playlist if needed
+            if hasattr(self, 'current_playlist') and song not in self.current_playlist:
+                if isinstance(song, dict):
+                    self.current_playlist.append(song)
+                else:
+                    self.current_playlist.append({
+                        'title': song_title,
+                        'artist': song_artist,
+                        'file_path': file_path,
+                        'album': song.get('album', 'Unknown Album') if isinstance(song, dict) else 'Unknown Album'
+                    })
+                self.current_index = len(self.current_playlist) - 1
+            
             # Show loading dialog for recommendations
             content = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(10))
             content.add_widget(Label(
-                text="Generating recommendations...",
+                text="Analyzing song and finding similar tracks...",
                 color=(0, 0, 0, 1),  # Black text
-                font_size='16sp'
+                font_size='16sp',
+                halign='center'
             ))
+            
+            # Add a progress bar
+            progress = ProgressBar(max=100, value=0)
+            content.add_widget(progress)
             
             # Create and show the loading popup
             dialog = Popup(
                 title='Finding Similar Songs',
                 content=content,
-                size_hint=(0.8, None),
-                height=dp(150),
+                size_hint=(0.8, 0.3),
                 separator_color=[0.13, 0.59, 0.95, 1],
                 title_color=[0, 0, 0, 1],
                 title_size='18sp'
             )
             dialog.open()
             
+            def update_progress(dt):
+                """Update progress bar"""
+                if progress.value < 90:  # Don't go to 100% to show we're still working
+                    progress.value += 10
+                    return True
+                return False
+                
+            # Start progress updates
+            progress_ev = Clock.schedule_interval(update_progress, 0.3)
+            
             def generate_playlist_async(dt):
                 """Generate recommendations asynchronously."""
                 try:
-                    # Simulate network/processing delay
-                    import time
-                    time.sleep(1.5)
-                    
                     # Generate new recommendations based on the selected song
-                    self.simulate_recommendations()
+                    success = self.simulate_recommendations()
+                    
+                    # Stop progress updates
+                    progress_ev.cancel()
                     
                     # Close the dialog
-                    if hasattr(dialog, 'parent') and dialog.parent and hasattr(dialog.parent, 'children') and dialog in dialog.parent.children:
+                    if dialog and hasattr(dialog, 'dismiss'):
                         dialog.dismiss()
                     
-                    self.show_snackbar("Recommendations updated!")
+                    if success:
+                        self.show_snackbar("Recommendations updated!")
                     
                 except Exception as e:
-                    # Close the dialog on error
-                    if hasattr(dialog, 'parent') and dialog.parent and hasattr(dialog.parent, 'children') and dialog in dialog.parent.children:
+                    # Stop progress updates on error
+                    progress_ev.cancel()
+                    
+                    # Close the dialog
+                    if dialog and hasattr(dialog, 'dismiss'):
                         dialog.dismiss()
                     
                     error_msg = f"Error generating recommendations: {str(e)}"
                     print(error_msg)
-                    self.show_error_dialog("Error", error_msg)
+                    self.show_error_dialog("Error", "Could not generate recommendations. Please try again.")
             
             # Schedule the async generation with a small delay
-            Clock.schedule_once(generate_playlist_async, 0.2)
+            Clock.schedule_once(generate_playlist_async, 0.5)
             
         except Exception as e:
             error_msg = f"Error selecting song: {str(e)}"
             print(error_msg)
-            self.show_error_dialog("Error", error_msg)
+            import traceback
+            traceback.print_exc()
+            self.show_error_dialog("Error", "An unexpected error occurred. Please try again.")
     
     def show_error_dialog(self, title, message):
         """Show an error dialog using a custom popup with standard Kivy Button"""
@@ -899,6 +1281,29 @@ MainScreen:
         seconds = int(seconds % 60)
         return f"{minutes:02d}:{seconds:02d}"
     
+    def on_pause(self):
+        # Handle app pause (e.g., when phone call comes in)
+        return True
+        
+    def toggle_theme(self, *args):
+        """Toggle between light and dark theme"""
+        try:
+            if self.theme_cls.theme_style == "Light":
+                self.theme_cls.theme_style = "Dark"
+                # Update any specific dark mode colors here
+            else:
+                self.theme_cls.theme_style = "Light"
+                # Update any specific light mode colors here
+                
+            # Force update the navigation buttons to reflect theme changes
+            if hasattr(self, 'root') and hasattr(self.root, 'ids'):
+                screen_manager = self.root.ids.get('screen_manager')
+                if screen_manager:
+                    self.update_nav_buttons(screen_manager.current)
+                    
+        except Exception as e:
+            print(f"Error toggling theme: {str(e)}")
+
     def on_stop(self):
         """Clean up when the app is closed."""
         music_player.cleanup()
